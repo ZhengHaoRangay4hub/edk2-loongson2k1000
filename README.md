@@ -55,9 +55,9 @@ LoongArch 需求）交叉编译，`-t GCC -a LOONGARCH64`。本地构建步骤�
 ```sh
 export GCC_LOONGARCH64_PREFIX=loongarch64-linux-gnu-
 make -C BaseTools && source edksetup.sh BaseTools
-dtc -I dts -O dtb -i Platform/Loongson/Loongson2K1000Pkg/Dts \
-    -o Platform/Loongson/Loongson2K1000Pkg/Dts/ls2k1000-la.dtb \
-    Platform/Loongson/Loongson2K1000Pkg/Dts/ls2k1000-la.dts
+D=Platform/Loongson/Loongson2K1000Pkg/Dts
+cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I $D $D/ls2k1000-la.dts | \
+  dtc -I dts -O dtb -o $D/ls2k1000-la.dtb -
 build -b RELEASE -t GCC -a LOONGARCH64 -p Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dsc
 ```
 
