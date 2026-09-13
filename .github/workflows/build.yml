@@ -77,6 +77,21 @@ jobs:
             -p OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc \
             -n $(nproc)
 
+      - name: Debug SecMain symbols (temporary)
+        if: always()
+        working-directory: edk2
+        run: |
+          B=Build/Loongson2K1000Pkg/${{ matrix.target }}_GCC/LOONGARCH64/Platform/Loongson/Loongson2K1000Pkg/Sec/SecMain/OUTPUT
+          echo "=== nm DdrEntry.obj (mm_ / DdrEntryAsm) ==="
+          loongarch64-unknown-linux-gnu-nm $B/PreMem/DdrEntry.obj 2>&1 | grep -iE 'mm_|DdrEntryAsm|hexchar' | head -20
+          echo "=== grep .iiii for globl/label ==="
+          grep -n 'globl mm_stringserial\|mm_stringserial:' $B/PreMem/DdrEntry.iiii | head -6
+          echo "=== tail of PmonDefs.h as seen by cpp ==="
+          loongarch64-unknown-linux-gnu-gcc -E -nostdinc -undef -x assembler-with-cpp \
+            -I Platform/Loongson/Loongson2K1000Pkg/Sec/PreMem \
+            Platform/Loongson/Loongson2K1000Pkg/Sec/PreMem/DdrEntry.S 2>/dev/null | \
+            grep -n 'LEAF\|globl mm_' | head -8
+
       - name: Collect artifacts
         if: always()
         run: |
