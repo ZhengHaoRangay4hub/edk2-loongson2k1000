@@ -47,19 +47,40 @@ BSD 许可），随后进入标准 PEI → DXE → BDS 流程。
 
 ## 构建方式
 
-GitHub Actions（`.github/workflows/build.yml`）使用
-`gcc-loongarch64-linux-gnu`（Ubuntu 24.04，GCC13/binutils2.40+，满足
-LoongArch 需求）交叉编译，`-t GCC -a LOONGARCH64`。本地构建步骤相同：
-把本包复制进 edk2 源码树 `Platform/Loongson/` 后执行
+GitHub Actions（`.github/workflows/build.yml`）使用龙芯官方交叉工具链
+[build-tools 2024.08.08](https://github.com/loongson/build-tools/releases)
+（gcc 14.2 / binutils 2.43，满足 edk2 主线 LoongArch 的
+`-mno-relax` 需求）交叉编译，`-t GCC -a LOONGARCH64`。每次 push 自动构建
+RELEASE + DEBUG 双目标，并在同一流水线里构建上游
+`OvmfPkg/LoongArchVirt`（QEMU）作回归对照。
+
+本地构建步骤相同：把本包复制进 edk2 源码树 `Platform/Loongson/` 后执行
 
 ```sh
-export GCC_LOONGARCH64_PREFIX=loongarch64-linux-gnu-
+export GCC_LOONGARCH64_PREFIX=loongarch64-unknown-linux-gnu-
 make -C BaseTools && source edksetup.sh BaseTools
 D=Platform/Loongson/Loongson2K1000Pkg/Dts
 cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I $D/include $D/ls2k1000-la.dts | \
   dtc -I dts -O dtb -o $D/ls2k1000-la.dtb -
+# PMON 的跨文件汇编聚合必须先内联（EDK2 的 Trim 工具会丢弃非顶层文件内容）
+python3 tools/merge_asm_includes.py \
+  Platform/Loongson/Loongson2K1000Pkg/Sec/PreMem/DdrEntry.S \
+  > Platform/Loongson/Loongson2K1000Pkg/Sec/PreMem/DdrEntry.merged.S
+mv Platform/Loongson/Loongson2K1000Pkg/Sec/PreMem/DdrEntry.merged.S \
+  Platform/Loongson/Loongson2K1000Pkg/Sec/PreMem/DdrEntry.S
 build -b RELEASE -t GCC -a LOONGARCH64 -p Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dsc
 ```
+
+## 验证状态
+
+- **CI 编译**：RELEASE/DEBUG 双目标绿灯（含 LoongArchVirt QEMU 对照构建）。
+- **QEMU 引导链**（`scripts/test-qemu-virt.sh`，macOS/Linux 均可）：
+  SEC → PEI → DXE → BDS 全链跑通，BDS 正常报告无可引导设备并进入
+  Boot Manager；UiApp 设置界面（FrontPage / Device Manager / Boot
+  Manager / Boot Maintenance Manager / 语言选择）经串口终端完整渲染。
+- **真机**：DDR3 初始化/leveling 序列按 PMON 原样移植且编译通过，
+  但**尚未在实体教育派上点灯验证**——首次上电请按 FLASHING.md 备份并
+  保留串口日志。
 
 ## 许可
 
