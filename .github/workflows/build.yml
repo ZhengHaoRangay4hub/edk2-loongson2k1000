@@ -22,7 +22,7 @@ jobs:
 
       - name: Checkout tianocore/edk2
         run: |
-          git clone --depth 1 --branch master https://github.com/tianocore/edk2.git edk2
+          git clone --depth 1 --branch master --recurse-submodules --shallow-submodules https://github.com/tianocore/edk2.git edk2
           echo "EDK2_SHA=$(git -C edk2 rev-parse HEAD)" | tee -a "$GITHUB_ENV"
 
       - name: Install toolchain
