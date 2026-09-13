@@ -43,6 +43,76 @@ LoongsonShutdown (
 }
 
 /**
+  Resets the entire platform (cold).
+
+  The PMC full-reset register drives both cold and warm resets on
+  2K1000LA; the SoC does not distinguish the two.
+**/
+VOID
+EFIAPI
+ResetCold (
+  VOID
+  )
+{
+  LoongsonWarmReset ();
+  CpuDeadLoop ();
+}
+
+/**
+  Resets the entire platform (warm).
+**/
+VOID
+EFIAPI
+ResetWarm (
+  VOID
+  )
+{
+  LoongsonWarmReset ();
+  CpuDeadLoop ();
+}
+
+/**
+  Powers down the platform (ACPI G2/S5).
+**/
+VOID
+EFIAPI
+ResetShutdown (
+  VOID
+  )
+{
+  LoongsonShutdown ();
+  CpuDeadLoop ();
+}
+
+/**
+  Resets the platform; the reset subtype GUID carried in ResetData is
+  not interpreted, a warm reset is performed.
+**/
+VOID
+EFIAPI
+ResetPlatformSpecific (
+  IN UINTN  DataSize,
+  IN VOID   *ResetData
+  )
+{
+  LoongsonWarmReset ();
+  CpuDeadLoop ();
+}
+
+/**
+  S3 resume is not supported by this platform; fall back to a cold reset.
+**/
+VOID
+EFIAPI
+EnterS3WithImmediateWake (
+  VOID
+  )
+{
+  LoongsonWarmReset ();
+  CpuDeadLoop ();
+}
+
+/**
   Resets the entire platform.
 **/
 VOID
