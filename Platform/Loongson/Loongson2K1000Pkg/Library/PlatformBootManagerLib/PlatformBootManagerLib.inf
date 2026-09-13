@@ -65,6 +65,7 @@
   gUefiOvmfPkgTokenSpaceGuid.PcdTerminalTypeGuidBuffer
 
 [Guids]
+  gFdtHobGuid
   gEfiEndOfDxeEventGroupGuid
   gEfiGlobalVariableGuid
   gRootBridgesConnectedEventGroupGuid
