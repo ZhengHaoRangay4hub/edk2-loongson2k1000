@@ -18,7 +18,7 @@
 
 [Packages]
   MdePkg/MdePkg.dec
-  Loongson2K1000Pkg.dec
+  Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dec
 
 [LibraryClasses]
   BaseLib
