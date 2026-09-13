@@ -1,0 +1,27 @@
+## @file
+#  PCI Host Bridge Library for Loongson 2K1000LA.
+#
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 1.29
+  BASE_NAME                      = LoongsonPciHostBridgeLib
+  FILE_GUID                      = 1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = PciHostBridgeLib|DXE_DRIVER
+
+[Sources]
+  LoongsonPciHostBridgeLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  OvmfPkg/OvmfPkg.dec
+
+[LibraryClasses]
+  DebugLib
+  MemoryAllocationLib
+  PciHostBridgeUtilityLib

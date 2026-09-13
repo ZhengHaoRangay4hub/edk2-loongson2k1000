@@ -1,0 +1,61 @@
+## @file
+#  Platform PEI driver for Loongson 2K1000LA (education board).
+#
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 1.29
+  BASE_NAME                      = PlatformPei
+  FILE_GUID                      = 4c0e81e5-e8e3-4eef-b24b-19b686e9ab53
+  MODULE_TYPE                    = PEIM
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = InitializePlatform
+
+[Sources]
+  Fv.c
+  MemDetect.c
+  Platform.c
+
+[Packages]
+  EmbeddedPkg/EmbeddedPkg.dec
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  OvmfPkg/OvmfPkg.dec
+  UefiCpuPkg/UefiCpuPkg.dec
+
+[Ppis]
+  gEfiPeiMasterBootModePpiGuid
+
+[Guids]
+  gEfiMemoryTypeInformationGuid
+  gFdtHobGuid
+  gRtcRegisterBaseAddressHobGuid
+
+[LibraryClasses]
+  BaseMemoryLib
+  CpuMmuInitLib
+  DebugLib
+  FdtLib
+  HobLib
+  MemoryAllocationLib
+  MpInitLib
+  PcdLib
+  PeimEntryPoint
+  PeiServicesLib
+  PlatformHookLib
+  ResourcePublicationLib
+
+[Pcd]
+  gUefiOvmfPkgTokenSpaceGuid.PcdDeviceTreeInitialBaseAddress
+  gUefiOvmfPkgTokenSpaceGuid.PcdDeviceTreeAllocationPadding
+  gEfiMdeModulePkgTokenSpaceGuid.PcdNullPointerDetectionPropertyMask
+
+[FixedPcd]
+  gUefiOvmfPkgTokenSpaceGuid.PcdOvmfSecPeiTempRamBase
+  gUefiOvmfPkgTokenSpaceGuid.PcdOvmfSecPeiTempRamSize
+  gEmbeddedTokenSpaceGuid.PcdPrePiCpuIoSize
+
+[Depex]
+  TRUE

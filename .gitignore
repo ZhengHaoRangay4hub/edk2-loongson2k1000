@@ -1,0 +1,4 @@
+*.dtb
+Build/
+edk2/
+*.log

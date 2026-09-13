@@ -1,0 +1,38 @@
+## @file
+#  Loongson 2K1000LA (education board) package.
+#
+#  Copyright (c) 2026, Loongson2K1000LA EDK2 port contributors.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = Loongson2K1000Pkg
+  PACKAGE_GUID                   = 6d3a7c8e-1f2b-4a3c-9d4e-5f6a7b8c9d0e
+  PACKAGE_VERSION                = 0.1
+
+[Includes]
+  Include
+
+[Guids]
+  gLoongson2K1000TokenSpaceGuid = { 0x7c8e1f2b, 0x4a3c, 0x4d4e, { 0x9d, 0x4e, 0x5f, 0x6a, 0x7b, 0x8c, 0x9d, 0x0e } }
+
+[PcdsFixedAtBuild]
+  ## PMC (power management controller) base address.
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonPmcBaseAddress|0x1fe27000|UINT32|0x00001001
+
+  ## Loongson compressed ECAM configuration space base address.
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonPciConfigBaseAddress|0xFE00000000|UINT64|0x00001002
+
+  ## On-chip SPI flash controller base address.
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiControllerBase|0x1fff0220|UINT32|0x00001003
+
+  ## SPI NOR XIP window base address.
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorBaseAddress|0x1c000000|UINT32|0x00001004
+
+  ## Offset of the UEFI variable store inside the SPI NOR.
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorVarStoreOffset|0x00400000|UINT32|0x00001005
+
+  ## Size of the UEFI variable store region (variable + FTW working + spare).
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorVarStoreSize|0x00090000|UINT32|0x00001006

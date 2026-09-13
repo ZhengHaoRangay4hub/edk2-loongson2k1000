@@ -1,0 +1,30 @@
+## @file
+#  PCI Library instance for Loongson 2K1000LA compressed ECAM.
+#
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 1.29
+  BASE_NAME                      = LoongsonPciLib
+  FILE_GUID                      = 3a2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+  MODULE_TYPE                    = BASE
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = PciLib
+
+[Sources]
+  LoongsonPciLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  Loongson2K1000Pkg.dec
+
+[LibraryClasses]
+  BaseLib
+  DebugLib
+  IoLib
+  PcdLib
+
+[FixedPcd]
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonPciConfigBaseAddress

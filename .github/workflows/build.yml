@@ -1,0 +1,88 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  EDK2_REF: master
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [RELEASE, DEBUG]
+
+    steps:
+      - name: Checkout port
+        uses: actions/checkout@v4
+
+      - name: Checkout tianocore/edk2
+        run: |
+          git clone --depth 1 --branch master https://github.com/tianocore/edk2.git edk2
+          echo "EDK2_SHA=$(git -C edk2 rev-parse HEAD)" | tee -a "$GITHUB_ENV"
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc g++ make python3 python3-pip uuid-dev nasm iasl device-tree-compiler \
+            gcc-loongarch64-linux-gnu binutils-loongarch64-linux-gnu
+
+      - name: Overlay Loongson2K1000Pkg into edk2 tree
+        run: |
+          mkdir -p edk2/Platform/Loongson
+          cp -r Platform/Loongson/Loongson2K1000Pkg edk2/Platform/Loongson/
+          # compile the platform DTB before the build consumes it
+          dtc -I dts -O dtb -i edk2/Platform/Loongson/Loongson2K1000Pkg/Dts \
+              -o edk2/Platform/Loongson/Loongson2K1000Pkg/Dts/ls2k1000-la.dtb \
+              edk2/Platform/Loongson/Loongson2K1000Pkg/Dts/ls2k1000-la.dts
+
+      - name: Build BaseTools
+        working-directory: edk2
+        run: |
+          export WORKSPACE=$PWD
+          make -C BaseTools -j$(nproc)
+
+      - name: Build Loongson2K1000Pkg (LS2K1000LA hardware firmware)
+        working-directory: edk2
+        run: |
+          export WORKSPACE=$PWD
+          export PACKAGES_PATH=$WORKSPACE
+          export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
+          export GCC_LOONGARCH64_PREFIX=loongarch64-linux-gnu-
+          source edksetup.sh BaseTools
+          build -b ${{ matrix.target }} -t GCC -a LOONGARCH64 \
+            -p Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dsc \
+            -n $(nproc)
+
+      - name: Build OvmfPkg/LoongArchVirt (QEMU regression target)
+        working-directory: edk2
+        run: |
+          export WORKSPACE=$PWD
+          export PACKAGES_PATH=$WORKSPACE
+          export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
+          export GCC_LOONGARCH64_PREFIX=loongarch64-linux-gnu-
+          source edksetup.sh BaseTools
+          build -b ${{ matrix.target }} -t GCC -a LOONGARCH64 \
+            -p OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc \
+            -n $(nproc)
+
+      - name: Collect artifacts
+        if: always()
+        run: |
+          mkdir -p dist
+          find edk2/Build -name '*.fd' -exec cp -v {} dist/ \; || true
+          cp edk2/Platform/Loongson/Loongson2K1000Pkg/Dts/ls2k1000-la.dtb dist/ || true
+          ( cd edk2 && git rev-parse HEAD ) > dist/edk2-commit.txt || true
+          ls -la dist/
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ls2k1000la-edk2-${{ matrix.target }}
+          path: dist/
+          if-no-files-found: error

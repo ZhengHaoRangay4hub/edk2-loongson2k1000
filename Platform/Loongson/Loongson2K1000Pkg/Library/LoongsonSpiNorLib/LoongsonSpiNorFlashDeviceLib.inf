@@ -1,0 +1,33 @@
+## @file
+#  VirtNorFlashDeviceLib implementation on the 2K1000LA SPI controller.
+#
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 1.29
+  BASE_NAME                      = LoongsonSpiNorFlashDeviceLib
+  FILE_GUID                      = 9b1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = VirtNorFlashDeviceLib
+
+[Sources]
+  LoongsonSpiNorFlashDeviceLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  OvmfPkg/OvmfPkg.dec
+  Loongson2K1000Pkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  IoLib
+  PcdLib
+
+[FixedPcd]
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiControllerBase
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorBaseAddress

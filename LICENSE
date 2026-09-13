@@ -1,0 +1,20 @@
+SPDX-License-Identifier: BSD-2-Clause-Patent
+
+Copyright (c) 2026, Loongson2K1000LA EDK2 port contributors.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
+
+SUBJECT TO ALL OF THE TERMS AND CONDITIONS OF THIS LICENSE, AND EXCEPT AS
+OTHERWISE SET FORTH HEREIN, RED HAT INC. AND ITS LICENSORS GRANT A COPYRIGHT
+LICENSE AND PATENT LICENSE...
+
+(Terms follow the standard BSD-2-Clause-Patent license as used by TianoCore;
+see https://github.com/tianocore/edk2/blob/master/License.txt)

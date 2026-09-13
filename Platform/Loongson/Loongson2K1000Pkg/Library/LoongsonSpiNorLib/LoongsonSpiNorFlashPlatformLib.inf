@@ -1,0 +1,31 @@
+## @file
+#  VirtNorFlashPlatformLib for the 2K1000LA SPI NOR variable store.
+#
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 1.29
+  BASE_NAME                      = LoongsonSpiNorFlashPlatformLib
+  FILE_GUID                      = 0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = VirtNorFlashPlatformLib
+
+[Sources]
+  LoongsonSpiNorFlashPlatformLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  OvmfPkg/OvmfPkg.dec
+  Loongson2K1000Pkg.dec
+
+[LibraryClasses]
+  DebugLib
+  PcdLib
+
+[FixedPcd]
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorBaseAddress
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorVarStoreOffset
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorVarStoreSize

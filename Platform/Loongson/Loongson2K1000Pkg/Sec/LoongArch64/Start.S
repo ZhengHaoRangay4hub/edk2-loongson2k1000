@@ -1,0 +1,208 @@
+#------------------------------------------------------------------------------
+#
+# SEC entry for Loongson 2K1000LA (education board / LS2K1000LA).
+#
+# Forked from OvmfPkg/LoongArchVirt/Sec/LoongArch64/Start.S (BSD-2-Patent,
+# Copyright (c) 2024 Loongson Technology Corporation Limited) and adapted for
+# real hardware: DRAM is not initialized at reset, so the SEC stage first
+# programs the SoC, PLLs and the DDR3 memory controller using the assembly
+# ported from Loongson PMON (pmon-ls2k1000la).
+#
+# SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+#  @par Glossary:
+#    - CSR - CPU Status Register
+#------------------------------------------------------------------------------
+#ifndef __ASSEMBLY__
+#define __ASSEMBLY__
+#endif
+
+#include <Library/BaseMemoryLib.h>
+#include <Register/LoongArch64/Csr.h>
+#include <Protocol/DebugSupport.h>
+
+#define BOOTCORE_ID  0
+
+/* On-chip SRAM overlay behind the SPI NOR XIP window - proven by PMON,
+ * which places its early stack at start + 256K. */
+#define PREMEM_STACK_TOP  0x1c040000
+
+/* Direct mapping windows, standard convention:
+ *   DMW0 0x9000000000000000 : PLV0-3, MAT0 (strongly-ordered uncached)
+ *   DMW1 0x8000000000000000 : PLV0-3, MAT1 (coherent cached)             */
+#define DMW0_UNCACHED  (0x9000000000000000 | 0xf)
+#define DMW1_CACHED    (0x8000000000000000 | 0x1f)
+
+#define CSR_DMW0  0x180
+#define CSR_DMW1  0x181
+#define CSR_CRMD  0x0
+
+ASM_GLOBAL ASM_PFX(_ModuleEntryPoint)
+ASM_PFX(_ModuleEntryPoint):
+	/* Disable global interrupt */
+	bl	DisableInterrupts
+
+	/* Disable all local interrupt */
+	li.w	$a0, 0x1FFF
+	bl	DisableLocalInterrupts
+
+	/* Direct mapping windows + direct address mode with cached attribute */
+	li.d	$t0, DMW0_UNCACHED
+	csrwr	$t0, CSR_DMW0
+	li.d	$t0, DMW1_CACHED
+	csrwr	$t0, CSR_DMW1
+	li.w	$t0, 0xb0		/* DATF=cached, DATM=cached, DA=1 */
+	csrwr	$t0, CSR_CRMD
+
+	/* Read physical cpu number id */
+	bl	GetApicId
+	li.d	$t0, BOOTCORE_ID
+	bne	$a0, $t0, SlaveMain
+
+	/*
+	 * BSP: park the stack in the on-chip SRAM overlay (no DRAM yet),
+	 * then run the pre-memory SoC/PLL/DDR bring-up.
+	 */
+	or	$s0, $zero, $zero	/* memdebug rodata base delta */
+	li.d	$sp, PREMEM_STACK_TOP
+	addi.d	$sp, $sp, -0x8
+
+	bl	PreMemInit		/* C: early UART + SoC early init */
+	bl	ClkSettingAsm		/* asm: CPU/DDR/GPU PLLs (PMON port) */
+	bl	DdrEntryAsm		/* asm: DDR3 init + leveling (PMON port),
+					   leaves memory size in $s2 */
+
+	/* DRAM is up: switch the stack to the permanent temporary RAM. */
+	li.d	$sp, FixedPcdGet64(PcdOvmfSecPeiTempRamBase) + FixedPcdGet32(PcdOvmfSecPeiTempRamSize)
+	addi.d	$sp, $sp, -0x8
+
+	/* Publish the device tree for the FDT based library classes. */
+	bl	PostMemInit
+
+	/* Load the exception vector base address */
+	li.d	$s0, FixedPcdGet64(PcdLoongArchExceptionVectorBaseAddress)
+
+	/* Construct SEC and PEI step exception environment */
+	la.pcrel $a1, ExceptionEntryStart
+	la.pcrel $t0, ExceptionEntryEnd
+	sub.d	$a2, $t0, $a1
+	li.w	$t0, (MAX_LOONGARCH_EXCEPTION +  MAX_LOONGARCH_INTERRUPT) * 512
+	bgeu	$a2, $t0, DeadLoop
+	move	$a0, $s0
+	bl	CopyMem
+
+	/* Configure BSP reset ebase */
+	move	$a0, $s0
+	bl	SetExceptionBaseAddress
+
+	/* Call the common SEC startup (hands off to the PEI core). */
+	li.d	$a0, FixedPcdGet64(PcdOvmfFdBaseAddress)	# FW base
+	addi.d	$a1, $sp, 0x8
+	bl	SecCoreStartupWithStack
+# End of _ModuleEntryPoint
+
+#------------------------------------------------------------------------------
+# Secondary core parking (from upstream OvmfPkg/LoongArchVirt Start.S).
+#------------------------------------------------------------------------------
+ASM_PFX(ClearMailBox):
+	/* Clear mailbox */
+	li.d	$t1, LOONGARCH_IOCSR_MBUF3
+	iocsrwr.d $zero, $t1
+	li.d	$t1, LOONGARCH_IOCSR_MBUF2
+	iocsrwr.d $zero, $t1
+	li.d	$t1, LOONGARCH_IOCSR_MBUF1
+	iocsrwr.d $zero, $t1
+	li.d	$t1, LOONGARCH_IOCSR_MBUF0
+	iocsrwr.d $zero, $t1
+	jirl	$zero, $ra, 0
+# End of ClearMailBox
+
+ASM_PFX(EnableIPI):
+	/* Enable IPI interrupt */
+	li.w	$t1, BIT12
+	csrxchg	$t1, $t1, LOONGARCH_CSR_ECFG
+
+	li.w	$t2, 0xFFFFFFFFU
+	li.d	$t1, LOONGARCH_IOCSR_IPI_EN
+	iocsrwr.w $t2, $t1
+	jirl	$zero, $ra, 0
+# End of EnableIPI
+
+ASM_PFX(GetApicId):
+	csrrd	$a0, LOONGARCH_CSR_CPUID
+	andi	$a0, $a0, 0x3ff
+	jirl	$zero, $ra, 0
+# End of GetApicId
+
+ASM_PFX(ApInitStack):
+	li.d	$t1, SIZE_1KB
+	csrrd	$t0, LOONGARCH_CSR_TMID
+	mul.d	$t1, $t0, $t1
+	li.d	$t2, FixedPcdGet32(PcdCpuMaxLogicalProcessorNumber)
+	bgeu	$t0, $t2, DeadLoop
+	li.d	$t0, FixedPcdGet64(PcdOvmfSecPeiTempRamBase) + FixedPcdGet32(PcdOvmfSecPeiTempRamSize) - SIZE_64KB
+	sub.d	$sp, $t0, $t1
+	addi.d	$sp, $sp, -0x8
+	jirl	$zero, $ra, 0
+# End of ApInitStack
+
+ASM_PFX(SlaveMain):
+	/* Set AP exception handle */
+	la.pcrel $a0, ApException
+	bl	SetExceptionBaseAddress
+
+	/* Clean up local mail box and open INT */
+	bl	ClearMailBox
+	bl	EnableIPI
+	bl	EnableInterrupts
+
+WaitForWake:
+	/* Wait for wakeup */
+	bl	CpuSleep
+	b	WaitForWake
+# End of SlaveMain
+
+.align 12
+ASM_PFX(ApException):
+	csrrd	$t0, LOONGARCH_CSR_ESTAT
+	srli.d	$t0, $t0, 12
+	andi	$t0, $t0, 0x1
+	beqz	$t0, DeadLoop
+
+	li.d	$t0, LOONGARCH_IOCSR_IPI_STATUS
+	iocsrrd.w $t1, $t0
+	li.d	$t0, LOONGARCH_IOCSR_IPI_CLEAR
+	iocsrwr.w $t1, $t0
+
+	/* Read mail buf and jump to specified entry */
+	li.d	$t1, LOONGARCH_IOCSR_MBUF0
+	iocsrrd.d $t0, $t1
+	beqz	$t0, OutOfException
+	csrwr	$t0, LOONGARCH_CSR_ERA
+	li.d	$t0, LOONGARCH_IOCSR_MBUF3
+	iocsrrd.d $a1, $t0
+	bl	ClearMailBox
+	beqz	$a1, NoParameterCall
+
+	//
+	// If the parameters are not NULL, then calling happened in FW ENV.
+	// Set the EBASE to be the same as BSP.
+	//
+	li.d	$a0, FixedPcdGet64(PcdLoongArchExceptionVectorBaseAddress)
+	bl	SetExceptionBaseAddress
+
+	bl	ApInitStack
+	bl	GetApicId
+	b	OutOfException
+NoParameterCall:
+	li.w	$t0, BIT2 // IE
+	csrxchg	$zero, $t0, LOONGARCH_CSR_PRMD // Clean PIE
+
+OutOfException:
+	ertn
+# End of ApException
+
+ASM_PFX(DeadLoop):
+	b	DeadLoop
+# End of DeadLoop
+.end

@@ -1,0 +1,151 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Device tree for the Loongson Education Pi (LS2K1000LA, LS2K1000_PAI_UDB).
+ *
+ * Based on arch/loongarch/boot/dts/loongson-2k1000-ref.dts from Linux,
+ * with the education board memory map (2GB) and on-board devices.
+ *
+ * This blob is embedded in the EDK2 firmware: UEFI consumes it for the
+ * early console, PCI host bridge, RTC and MMIO layout, and hands it to
+ * EFI-stub kernels (OpenWrt/GRUB) through the EFI configuration table.
+ */
+
+/dts-v1/;
+
+#include "dt-bindings/interrupt-controller/irq.h"
+#include "dt-bindings/clock/loongson,ls2k-clk.h"
+#include "dt-bindings/gpio/gpio.h"
+#include "loongson-2k1000.dtsi"
+
+/ {
+	compatible = "loongson,ls2k1000-edu", "loongson,ls2k1000";
+	model = "Loongson-2K1000LA Education Board";
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	/* 2GB DDR3: low window + high window, 2MB firmware reserve at 0. */
+	memory@200000 {
+		device_type = "memory";
+		reg = <0x0 0x00200000 0x0 0x0ee00000>,
+		      <0x0 0x90000000 0x0 0x70000000>;
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		linux,cma {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x0 0x2000000>;
+			linux,cma-default;
+		};
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&rtc0 {
+	status = "okay";
+};
+
+&ehci0 {
+	status = "okay";
+};
+
+&ohci0 {
+	status = "okay";
+};
+
+&sata {
+	status = "okay";
+};
+
+&gmac0 {
+	status = "okay";
+
+	phy-mode = "rgmii-id";
+	phy-handle = <&phy0>;
+	mdio {
+		compatible = "snps,dwmac-mdio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		phy0: ethernet-phy@0 {
+			reg = <0>;
+		};
+	};
+};
+
+&gmac1 {
+	status = "okay";
+
+	phy-mode = "rgmii-id";
+	phy-handle = <&phy1>;
+	mdio {
+		compatible = "snps,dwmac-mdio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		phy1: ethernet-phy@1 {
+			reg = <16>;
+		};
+	};
+};
+
+&spi0 {
+	status = "okay";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <40000000>;
+	};
+};
+
+&mmc {
+	status = "okay";
+
+	bus-width = <4>;
+	cd-gpios = <&gpio0 22 GPIO_ACTIVE_LOW>;
+};
+
+&pctrl {
+	status = "okay";
+
+	sdio_pins_default: sdio-pins {
+		sdio-pinmux {
+			groups = "sdio";
+			function = "sdio";
+		};
+	};
+
+	i2c0_pins_default: i2c0-pins {
+		pinmux {
+			groups = "i2c0";
+			function = "i2c0";
+		};
+	};
+};
+
+&i2c2 {
+	status = "okay";
+
+	#address-cells = <1>;
+	#size-cells = <0>;
+	eeprom@57 {
+		compatible = "atmel,24c16";
+		reg = <0x57>;
+		pagesize = <16>;
+	};
+};
