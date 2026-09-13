@@ -10,7 +10,7 @@
 
 #####################################################################################################
 [Defines]
-!include Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.fdf.inc
+!include Loongson2K1000Pkg.fdf.inc
 
 #####################################################################################################
 [FD.UEFI]
@@ -151,13 +151,6 @@ READ_LOCK_CAP      = TRUE
 READ_LOCK_STATUS   = TRUE
 
 #
-# The platform device tree blob is consumed by the SEC stage.
-#
-FILE FREEFORM = e1f5c2a9-8b3d-4c6e-9f70-1a2b3c4d5e6f {
-  SECTION RAW = Platform/Loongson/Loongson2K1000Pkg/Dts/ls2k1000-la.dtb
-}
-
-#
 #  PEI Phase priori modules
 #
 APRIORI PEI {
@@ -176,6 +169,13 @@ INF  MdeModulePkg/Core/Pei/PeiMain.inf
 INF  MdeModulePkg/Universal/PCD/Pei/Pcd.inf
 INF  Platform/Loongson/Loongson2K1000Pkg/PlatformPei/PlatformPei.inf
 INF  MdeModulePkg/Core/DxeIplPeim/DxeIpl.inf
+
+#
+#  Platform device tree blob, consumed by the SEC stage
+#
+FILE FREEFORM = e1f5c2a9-8b3d-4c6e-9f70-1a2b3c4d5e6f {
+  SECTION RAW = Platform/Loongson/Loongson2K1000Pkg/Dts/ls2k1000-la.dtb
+}
 
 #
 # DXE Phase modules
@@ -246,8 +246,3 @@ FILE FV_IMAGE = 9E21FD93-9C72-4c15-8C4B-E77F1DB2D792 {
     UI       STRING="$(MODULE_NAME)" Optional
   }
 
-#####################################################################################################
-[Rule.Common.USER_DEFINED.APIT]
-  FILE FREEFORM = $(NAMED_GUID) {
-    RAW       RAW  Optional          |.dtb
-  }
