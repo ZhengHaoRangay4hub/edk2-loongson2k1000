@@ -217,9 +217,9 @@ UINT##WIDTH                                                                    \
 EFIAPI                                                                         \
 PciBitFieldWrite##WIDTH (                                                      \
   IN UINTN                 Address,                                            \
-  IN UINT##WIDTH           Value,                                              \
   IN UINTN                 StartBit,                                           \
-  IN UINTN                 EndBit                                              \
+  IN UINTN                 EndBit,                                             \
+  IN UINT##WIDTH           Value                                               \
   )                                                                            \
 {                                                                              \
   return PciWrite##WIDTH (Address, BitFieldWrite##WIDTH ((UINT##WIDTH)PciRead##WIDTH (Address), StartBit, EndBit, Value)); \
