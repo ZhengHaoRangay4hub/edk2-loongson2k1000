@@ -202,7 +202,6 @@ PcieEarlyConf (
   }
 }
 
-STATIC
 VOID
 SataClkConfig (
   VOID
@@ -214,7 +213,6 @@ SataClkConfig (
   MmioWrite64 (SYSCONF (0x458), 0x1403f1002ULL);
 }
 
-STATIC
 VOID
 GmacAndGeneralCfg (
   VOID
