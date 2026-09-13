@@ -17,6 +17,7 @@
 #include <Library/DebugLib.h>
 #include <Library/HobLib.h>
 #include <Library/PcdLib.h>
+#include <Library/MemoryAllocationLib.h>
 #include <Library/ResourcePublicationLib.h>
 #include <Uefi/UefiSpec.h>
 #include "Platform.h"
