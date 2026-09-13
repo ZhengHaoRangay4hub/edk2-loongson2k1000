@@ -15,6 +15,7 @@
 
 #include <Base.h>
 #include <Library/BaseLib.h>
+#include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
 #include <Library/IoLib.h>
 #include <Library/PcdLib.h>
@@ -45,18 +46,6 @@
 
 #define SPI_CS_ASSERT   0x01
 #define SPI_CS_RELEASE  0x11
-
-/**
-  Return the uncached alias of a flash offset.
-**/
-STATIC
-UINTN
-FlashXipAddress (
-  IN UINTN  FlashOffset
-  )
-{
-  return UNCACHED (FixedPcdGet32 (PcdLoongsonSpiNorBaseAddress) + FlashOffset);
-}
 
 STATIC
 VOID

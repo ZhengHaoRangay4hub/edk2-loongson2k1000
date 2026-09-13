@@ -17,6 +17,7 @@
   Loongson2KResetSystemLib.c
 
 [Packages]
+  MdeModulePkg/MdeModulePkg.dec
   MdePkg/MdePkg.dec
   Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dec
 
