@@ -62,3 +62,16 @@
  */
 #define LEAF(x)  .globl x ; x:
 #define END(x)
+
+/* 16550 register offsets used by the PMON memdebug routines (byte stride). */
+#define NSREG(x)          (x)
+#define NS16550_DATA      0x0
+#define NS16550_IER       0x1
+#define NS16550_LSR       0x5
+#define LSR_TXRDY         0x20
+#define LSR_RXRDY         0x01
+
+/* DDR PHY clock in MHz (matches ClkSetting.S default; education board = 400). */
+#ifndef DDR_FREQ
+#define DDR_FREQ 400
+#endif

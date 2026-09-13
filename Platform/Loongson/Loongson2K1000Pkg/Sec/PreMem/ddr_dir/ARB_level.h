@@ -76,7 +76,7 @@
 //#define MC_RST_DELAY        (0x40000)   //work ok
 //#define MC_RST_DELAY        (0x100000)    //work ok
 
-#define GET_ARB_LEVEL_NODE_ID   dli a1, 0x3; and a1, a1, s1;
+#define GET_ARB_LEVEL_NODE_ID   dli $a1, 0x3; and $a1, $a1, $s1;
 
 #define ARB_STORE_BASE  0x9000001000000600  //(600 ~ 800 -- 512B max, 64 registers)
 #define ARB_STACK_BASE  0x9000001000000800  //(800 ~ a00 -- 512B max, 64 registers)

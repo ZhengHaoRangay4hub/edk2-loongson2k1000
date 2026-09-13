@@ -87,8 +87,8 @@ Function: Macro defination for Test_Mem.S
 #define GET_TM_NODE_ID_a1 GET_ARB_LEVEL_NODE_ID
 
 #define ROW_COL_UPPER_LIMIT 27
-#define GET_TM_UP_ADDR  dli t3, ARB_TM_BASE; GET_TM_NODE_ID_a1; dsll a1, a1, 44; or t3, t3, a1; daddu t3, t3, s4;
-#define GET_TM_MSIZE    dli a1, 0x40000;
+#define GET_TM_UP_ADDR  dli $t3, ARB_TM_BASE; GET_TM_NODE_ID_a1; dsll $a1, $a1, 44; or $t3, $t3, $a1; daddu $t3, $t3, $s4;
+#define GET_TM_MSIZE    dli $a1, 0x40000;
 //Memory size to be tested
 
 //#define LEVEL_SPECIFIED_BYTE_LANES
@@ -102,7 +102,7 @@ Function: Macro defination for Test_Mem.S
 #define TM_MAX_ERRORS  0x10
 
 //obsolete now
-//#define GET_RD_LEVEL    dli a1, 0x0;
-//#define GET_MICRO_TUNE  dli a2, 0x0;
+//#define GET_RD_LEVEL    dli $a1, 0x0;
+//#define GET_MICRO_TUNE  dli $a2, 0x0;
 //#define MACRO_SCALE     3
 //obsolete now

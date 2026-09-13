@@ -67,15 +67,15 @@ Function: Macro defination for Test_Mem.S
 #define MT_CODE_BASE    0x9000000000000600  //(600 ~ 4000 -- 1.5K ~ 16K, 14.5K max)
 #define MT_MSG_BASE     0x9000000000004000  //(4000 ~ 10000 -- 16K ~ 64K, 48K max)
 
-#define GET_TM_NODE_ID_a1   srli.d a1, s1, 62;
-#define GET_TM_CORE_ID_a1   srli.d a1, s1, 60; andi a1, a1, 0x3;
-#define GET_TM_START_ADDR   li.d  a1, 0xfffffffffff; and a1, s1, a1;
-#define GET_TM_MSIZE    li.d a1, 0x00ff000000000000;and a1, a1, s1; srli.d a1, a1, 21; //Memory size to be tested
-#define GET_NODE_MSIZE  li.d  a1, 0x80000000;
+#define GET_TM_NODE_ID_a1   srli.d $a1, $s1, 62;
+#define GET_TM_CORE_ID_a1   srli.d $a1, $s1, 60; andi $a1, $a1, 0x3;
+#define GET_TM_START_ADDR   li.d  $a1, 0xfffffffffff; and $a1, $s1, $a1;
+#define GET_TM_MSIZE    li.d $a1, 0x00ff000000000000;and $a1, $a1, $s1; srli.d $a1, $a1, 21; //Memory size to be tested
+#define GET_NODE_MSIZE  li.d  $a1, 0x80000000;
 
-#define GET_RD_LEVEL    li.d a1, 0x1; and a1, s4, a1;
-#define GET_MICRO_TUNE  li.d a2, 0x10; and a2, s4, a2; srli.d a2, a2, 4;
-#define GET_DISPRINT_BIT    li.d a1, 0x1000; and a1, s4, a1;
+#define GET_RD_LEVEL    li.d $a1, 0x1; and $a1, $s4, $a1;
+#define GET_MICRO_TUNE  li.d $a2, 0x10; and $a2, $s4, $a2; srli.d $a2, $a2, 4;
+#define GET_DISPRINT_BIT    li.d $a1, 0x1000; and $a1, $s4, $a1;
 
 //#define LEVEL_SPECIFIED_BYTE_LANES
 #ifdef  LEVEL_SPECIFIED_BYTE_LANES

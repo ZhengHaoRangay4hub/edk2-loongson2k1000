@@ -67,7 +67,7 @@ DIMM infor:
 |[15:15]| SDRAM_WIDTH        | 1'b1    | x16               |
 |       |                    | 1'b0    | x8                |
 ------------------------------------------------------------
-|[63:48]| MC1--like s1[31:16] for MC0
+|[63:48]| MC1--like $s1[31:16] for MC0
 temparary used in PROBE_DIMM
 |[38:32]| DIMM_MEMSIZE       | 7'b0000 | 0M                |
 |       |                    | 7'b0001 | 512M              |
@@ -212,77 +212,77 @@ temparary used in PROBE_DIMM
 #endif
 #endif
 
-#define GET_NODE_ID_a0  li.d a0, 0x00000003; and a0, s1, a0; slli.d a0, a0, 44;
-#define GET_NODE_ID_a1  li.d a1, 0x00000003; and a1, s1, a1;
-#define GET_MC_SEL_BITS li.d a1, 0x0000000c; and a1, s1, a1; srli.d a1, a1, 2;
-#define GET_MC0_ONLY    li.d a1, 0x00000004; and a1, s1, a1;
-#define GET_MC1_ONLY    li.d a1, 0x00000008; and a1, s1, a1;
+#define GET_NODE_ID_a0  li.d $a0, 0x00000003; and $a0, $s1, $a0; slli.d $a0, $a0, 44;
+#define GET_NODE_ID_a1  li.d $a1, 0x00000003; and $a1, $s1, $a1;
+#define GET_MC_SEL_BITS li.d $a1, 0x0000000c; and $a1, $s1, $a1; srli.d $a1, $a1, 2;
+#define GET_MC0_ONLY    li.d $a1, 0x00000004; and $a1, $s1, $a1;
+#define GET_MC1_ONLY    li.d $a1, 0x00000008; and $a1, $s1, $a1;
 #ifdef  NO_L2XBAR_CONFIGURE
 #define XBAR_CONFIG_NODE_a0(OFFSET, BASE, MASK, MMAP) ;
 #define L2XBAR_CLEAR_WINDOW(OFFSET) ;
 #else
 #define XBAR_CONFIG_NODE_a0(OFFSET, BASE, MASK, MMAP) \
-                        addi.d  a4, t0, OFFSET;       \
-                        li.d     a5, BASE;             \
-                        or      a5, a5, a0;           \
-                        st.d      a5, a4, 0x00;         \
-                        li.d     a5, MASK;             \
-                        st.d      a5, a4, 0x40;         \
-                        li.d     a5, MMAP;             \
-                        st.d      a5, a4, 0x80
+                        addi.d  $a4, $t0, OFFSET;       \
+                        li.d     $a5, BASE;             \
+                        or      $a5, $a5, $a0;           \
+                        st.d      $a5, $a4, 0x00;         \
+                        li.d     $a5, MASK;             \
+                        st.d      $a5, $a4, 0x40;         \
+                        li.d     $a5, MMAP;             \
+                        st.d      $a5, $a4, 0x80
 #define L2XBAR_CLEAR_WINDOW(OFFSET) \
-                        addi.d  a4, t0, OFFSET;       \
-                        st.d      zero, a4, 0x80;         \
-                        st.d      zero, a4, 0x00;         \
-                        st.d      zero, a4, 0x40;
+                        addi.d  $a4, $t0, OFFSET;       \
+                        st.d      $zero, $a4, 0x80;         \
+                        st.d      $zero, $a4, 0x00;         \
+                        st.d      $zero, $a4, 0x40;
 #define L2XBAR_CONFIG_INTERLEAVE(OFFSET, BASE, MASK, MMAP) \
-                        addi.d  a4, t0, OFFSET;       \
-                        ld.d      a5, a4, 0x00;         \
-                        li.d  tp, BASE;   or      a5, a5, tp;         \
-                        st.d      a5, a4, 0x00;         \
-                        ld.d      a5, a4, 0x40;         \
-                        li.d  tp, MASK;   or      a5, a5, tp;         \
-                        st.d      a5, a4, 0x40;         \
-                        ld.d      a5, a4, 0x80;         \
-                        li.d  tp, MMAP;   or      a5, a5, tp;         \
-                        st.d      a5, a4, 0x80;
+                        addi.d  $a4, $t0, OFFSET;       \
+                        ld.d      $a5, $a4, 0x00;         \
+                        li.d  $tp, BASE;   or      $a5, $a5, $tp;         \
+                        st.d      $a5, $a4, 0x00;         \
+                        ld.d      $a5, $a4, 0x40;         \
+                        li.d  $tp, MASK;   or      $a5, $a5, $tp;         \
+                        st.d      $a5, $a4, 0x40;         \
+                        ld.d      $a5, $a4, 0x80;         \
+                        li.d  $tp, MMAP;   or      $a5, $a5, $tp;         \
+                        st.d      $a5, $a4, 0x80;
 //special used, not general, you must guarantee the original MMAP is 0xxxxF1.
 #define L2XBAR_RECONFIG_TO_MC0(OFFSET) \
-                        addi.d  a4, t0, OFFSET;       \
-                        ld.d      a5, a4, 0x80;         \
-                        xor     a5, a5, 0x1;          \
-                        st.d      a5, a4, 0x80;
+                        addi.d  $a4, $t0, OFFSET;       \
+                        ld.d      $a5, $a4, 0x80;         \
+                        xor     $a5, $a5, 0x1;          \
+                        st.d      $a5, $a4, 0x80;
 #define L2XBAR_RECONFIG_TO_MC1(OFFSET) \
-                        addi.d  a4, t0, OFFSET;       \
-                        ld.d      a5, a4, 0x80;         \
-                        ori     a5, a5, 0x1;          \
-                        st.d      a5, a4, 0x80;
+                        addi.d  $a4, $t0, OFFSET;       \
+                        ld.d      $a5, $a4, 0x80;         \
+                        ori     $a5, $a5, 0x1;          \
+                        st.d      $a5, $a4, 0x80;
 #define L2XBAR_CONFIG_PCI_AS_CPU(OFFSET) \
-                        addi.d  a4, t0, OFFSET;       \
-                        ld.d      a5, a4, 0x0;          \
-                        st.d      a5, a4, 0x100;        \
-                        ld.d      a5, a4, 0x40;         \
-                        st.d      a5, a4, 0x140;        \
-                        ld.d      a5, a4, 0x80;         \
-                        st.d      a5, a4, 0x180
+                        addi.d  $a4, $t0, OFFSET;       \
+                        ld.d      $a5, $a4, 0x0;          \
+                        st.d      $a5, $a4, 0x100;        \
+                        ld.d      $a5, $a4, 0x40;         \
+                        st.d      $a5, $a4, 0x140;        \
+                        ld.d      $a5, $a4, 0x80;         \
+                        st.d      $a5, $a4, 0x180
 //special used, not general.
 #define L2XBAR_CONFIG_PCI_BASE_0to8(OFFSET) \
-                        addi.d  a4, t0, OFFSET;       \
-                        ld.d      a5, a4, 0x0;          \
-                        li.d     a1, 0x80000000;       \
-                        or      a5, a5, a1;           \
-                        st.d      a5, a4, 0x0
+                        addi.d  $a4, $t0, OFFSET;       \
+                        ld.d      $a5, $a4, 0x0;          \
+                        li.d     $a1, 0x80000000;       \
+                        or      $a5, $a5, $a1;           \
+                        st.d      $a5, $a4, 0x0
 #define L2XBAR_DISABLE_WINDOW(OFFSET) \
-                        addi.d  a4, t0, OFFSET;       \
-                        st.d      zero, a4, 0x80
+                        addi.d  $a4, $t0, OFFSET;       \
+                        st.d      $zero, $a4, 0x80
 #define L2XBAR_ENABLE_WINDOW(OFFSET) \
-                        addi.d  a4, t0, OFFSET;       \
-                        ld.d      a5, a4, 0x80;         \
-                        ori     a5, a5, 0x80;         \
-                        st.d      a5, a4, 0x80
+                        addi.d  $a4, $t0, OFFSET;       \
+                        ld.d      $a5, $a4, 0x80;         \
+                        ori     $a5, $a5, 0x80;         \
+                        st.d      $a5, $a4, 0x80
 #endif
 //------------------------
-//defination for s1
+//defination for $s1
 #define SDRAM_TYPE_OFFSET   30
 #define DIMM_ECC_OFFSET     29
 #define DIMM_TYPE_OFFSET    28
@@ -303,79 +303,79 @@ temparary used in PROBE_DIMM
 #define DIMM_MEMSIZE_MASK   (0x7f)
 //------------------------
 #define GET_SDRAM_TYPE      \
-li.d     a1, 0x3;\
-slli.d    a1, a1, SDRAM_TYPE_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, SDRAM_TYPE_OFFSET;
+li.d     $a1, 0x3;\
+slli.d    $a1, $a1, SDRAM_TYPE_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, SDRAM_TYPE_OFFSET;
 #define GET_SDRAM_WIDTH      \
-li.d     a1, 0x1;\
-slli.d    a1, a1, SDRAM_WIDTH_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, SDRAM_WIDTH_OFFSET;
+li.d     $a1, 0x1;\
+slli.d    $a1, $a1, SDRAM_WIDTH_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, SDRAM_WIDTH_OFFSET;
 #define GET_MC1_SDRAM_WIDTH      \
-li.d     a1, 0x1;\
-slli.d    a1, a1, MC1_SDRAM_WIDTH_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, MC1_SDRAM_WIDTH_OFFSET;
+li.d     $a1, 0x1;\
+slli.d    $a1, $a1, MC1_SDRAM_WIDTH_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, MC1_SDRAM_WIDTH_OFFSET;
 #define GET_DIMM_ECC       \
-li.d     a1, 0x1;\
-slli.d    a1, a1, DIMM_ECC_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, DIMM_ECC_OFFSET;
+li.d     $a1, 0x1;\
+slli.d    $a1, $a1, DIMM_ECC_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, DIMM_ECC_OFFSET;
 #define GET_DIMM_TYPE      \
-li.d     a1, 0x1;\
-slli.d    a1, a1, DIMM_TYPE_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, DIMM_TYPE_OFFSET;
+li.d     $a1, 0x1;\
+slli.d    $a1, $a1, DIMM_TYPE_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, DIMM_TYPE_OFFSET;
 #define GET_DIMM_WIDTH          \
-li.d     a1, 0x1;\
-slli.d    a1, a1, DIMM_WIDTH_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, DIMM_WIDTH_OFFSET;
+li.d     $a1, 0x1;\
+slli.d    $a1, $a1, DIMM_WIDTH_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, DIMM_WIDTH_OFFSET;
 #define GET_ROW_SIZE      \
-li.d     a1, 0x7;\
-slli.d    a1, a1, ROW_SIZE_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, ROW_SIZE_OFFSET;
+li.d     $a1, 0x7;\
+slli.d    $a1, $a1, ROW_SIZE_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, ROW_SIZE_OFFSET;
 #define GET_EIGHT_BANK      \
-li.d     a1, 0x1;\
-slli.d    a1, a1, EIGHT_BANK_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, EIGHT_BANK_OFFSET;
+li.d     $a1, 0x1;\
+slli.d    $a1, $a1, EIGHT_BANK_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, EIGHT_BANK_OFFSET;
 #define GET_ADDR_MIRROR      \
-li.d     a1, 0x1;\
-slli.d    a1, a1, ADDR_MIRROR_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, ADDR_MIRROR_OFFSET;
+li.d     $a1, 0x1;\
+slli.d    $a1, $a1, ADDR_MIRROR_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, ADDR_MIRROR_OFFSET;
 #define GET_COL_SIZE      \
-li.d     a1, 0x3;\
-slli.d    a1, a1, COL_SIZE_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, COL_SIZE_OFFSET;
+li.d     $a1, 0x3;\
+slli.d    $a1, $a1, COL_SIZE_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, COL_SIZE_OFFSET;
 #define GET_MC_CS_MAP      \
-li.d     a1, MC_CS_MAP_MASK;\
-slli.d    a1, a1, MC_CS_MAP_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, MC_CS_MAP_OFFSET;
+li.d     $a1, MC_CS_MAP_MASK;\
+slli.d    $a1, $a1, MC_CS_MAP_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, MC_CS_MAP_OFFSET;
 #define GET_MC1_CS_MAP      \
-li.d     a1, MC_CS_MAP_MASK;\
-slli.d    a1, a1, MC1_CS_MAP_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, MC1_CS_MAP_OFFSET;
+li.d     $a1, MC_CS_MAP_MASK;\
+slli.d    $a1, $a1, MC1_CS_MAP_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, MC1_CS_MAP_OFFSET;
 #define GET_DIMM_MEMSIZE      \
-li.d     a1, DIMM_MEMSIZE_MASK;\
-slli.d    a1, a1, DIMM_MEMSIZE_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, DIMM_MEMSIZE_OFFSET;
+li.d     $a1, DIMM_MEMSIZE_MASK;\
+slli.d    $a1, $a1, DIMM_MEMSIZE_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, DIMM_MEMSIZE_OFFSET;
 #define GET_MC1_MEMSIZE      \
-li.d     a1, MC_MEMSIZE_MASK;\
-slli.d    a1, a1, MC1_MEMSIZE_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, MC1_MEMSIZE_OFFSET;
+li.d     $a1, MC_MEMSIZE_MASK;\
+slli.d    $a1, $a1, MC1_MEMSIZE_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, MC1_MEMSIZE_OFFSET;
 #define GET_MC0_MEMSIZE      \
-li.d     a1, MC_MEMSIZE_MASK;\
-slli.d    a1, a1, MC0_MEMSIZE_OFFSET;\
-and     a1, s1, a1;\
-srli.d    a1, a1, MC0_MEMSIZE_OFFSET;
+li.d     $a1, MC_MEMSIZE_MASK;\
+slli.d    $a1, $a1, MC0_MEMSIZE_OFFSET;\
+and     $a1, $s1, $a1;\
+srli.d    $a1, $a1, MC0_MEMSIZE_OFFSET;
 #endif
 
