@@ -51,6 +51,6 @@
 #define SR_IF     0x1
 
 /* msize lives in $s2 across the DDR init assembly (PMON convention). */
-#define msize  s2
+#define msize  $s2
 
 #endif /* __PMON_DEFS_H__ */
