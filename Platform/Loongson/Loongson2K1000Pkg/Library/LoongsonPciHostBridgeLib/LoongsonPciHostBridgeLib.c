@@ -17,6 +17,9 @@
 #include <Library/PciHostBridgeUtilityLib.h>
 #include <Library/MemoryAllocationLib.h>
 
+#include <Protocol/PciRootBridgeIo.h>
+#include <Protocol/PciHostBridgeResourceAllocation.h>
+
 STATIC PCI_ROOT_BRIDGE_APERTURE  mNonExistAperture = { MAX_UINT64, 0 };
 
 STATIC PCI_ROOT_BRIDGE_APERTURE  mIoAperture  = { 0x18008000, 0x8000 };
