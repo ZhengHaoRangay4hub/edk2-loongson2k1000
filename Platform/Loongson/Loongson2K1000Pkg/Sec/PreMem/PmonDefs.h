@@ -54,3 +54,11 @@
 #define msize  $s2
 
 #endif /* __PMON_DEFS_H__ */
+
+/*
+ * PMON assembly function entry/exit macros. The PMON sources rely on
+ * LEAF()/END() emitting a global label; gas has no such builtin, so the
+ * cpp must expand them explicitly.
+ */
+#define LEAF(x)  .globl x ; x:
+#define END(x)

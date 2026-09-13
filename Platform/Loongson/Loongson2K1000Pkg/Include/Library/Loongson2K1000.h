@@ -18,7 +18,7 @@
 #define LS_MMIO_UNCACHED(Base)  (0x9000000000000000ULL | (UINT64)(Base))
 
 /* APB / low-speed peripherals on the 2K1000LA internal bus */
-#define LS2K_UART0_BASE         0x1fe001e0  /* 16550, console */
+#define LS2K_UART0_BASE         0x1fe20000  /* 16550, console (matches uart0 in DTS) */
 #define LS2K_UART0_CLOCK        125000000   /* 125 MHz APB clock */
 
 #define LS2K_SPI0_BASE          0x1fff0220  /* on-chip SPI master (SPI NOR) */

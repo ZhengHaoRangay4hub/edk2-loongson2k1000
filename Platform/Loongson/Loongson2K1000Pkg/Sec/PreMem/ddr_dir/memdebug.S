@@ -113,6 +113,13 @@ LEAF(mm_tgt_putchar)
     nop
 END(mm_tgt_putchar)
 
+.section .rodata
+.align 3
+.globl hexchar
+hexchar:
+.ascii "0123456789abcdef"
+.text
+
 LEAF(mm_hexserial64)
 	ori	$a2, $ra, 0
 	ori	$a1, $a0, 0
@@ -123,7 +130,6 @@ LEAF(mm_hexserial64)
 	andi	$a0, $a0, 0xf
 
 	la	$a4, hexchar
-	sub.d	$a4, $a4, $s0
 
 	add.d	$a4, $a4, $a0
 	ld.bu	$a0, $a4, 0
@@ -164,7 +170,6 @@ LEAF(mm_hexserial)
 	andi	$a0, $a0, 0xf
 
 	la	$a4, hexchar
-	sub.d	$a4, $a4, $s0
 
 	add.d	$a4, $a4, $a0
 	ld.bu	$a0, $a4, 0
