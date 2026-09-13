@@ -30,3 +30,5 @@
     .section .rodata;98: .asciz x; .text; la $a0, 98b; bl mm_stringserial
 
 #define MM_TTYDBG MM_PRINTSTR
+
+#define PRINTSTR(x) MM_PRINTSTR(x)

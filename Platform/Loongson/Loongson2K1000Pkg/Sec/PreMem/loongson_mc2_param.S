@@ -1,9 +1,13 @@
 //DDR2 param
     .align 5
+.globl ddr2_reg_data
 ddr2_reg_data:
+.globl ddr2_reg_data_mc1
 ddr2_reg_data_mc1:
 
+.globl ddr2_RDIMM_reg_data
 ddr2_RDIMM_reg_data:
+.globl ddr2_RDIMM_reg_data_mc1
 ddr2_RDIMM_reg_data_mc1:
 
 #ifdef LS2K_STR
@@ -80,7 +84,9 @@ ddr2_RDIMM_reg_data_mc1:
 //DDR3 param
     .section .rodata
     .align  5
+.globl ddr3_reg_data
 ddr3_reg_data:
+.globl ddr3_reg_data_mc1
 ddr3_reg_data_mc1:
 MC0_DDR3_CTRL_0x000: .dword 0x0300000000000000
 //XXXX pm_dll_value_0(RD) XXXX pm_dll_value_ck(RD) XXXX pm_dll_init_done(RD) XXXX pm_version(RD)
@@ -329,7 +335,9 @@ MC0_DDR3_CTRL_0x360: .dword 0x0000000000000000
 MC0_DDR3_CTRL_0x368: .dword 0x0000000000000000
 //_XXXXXXXXXXXXXXXX
 
+.globl ddr3_RDIMM_reg_data
 ddr3_RDIMM_reg_data:
+.globl ddr3_RDIMM_reg_data_mc1
 ddr3_RDIMM_reg_data_mc1:
 MC0_DDR3_RDIMM_CTRL_0x000: .dword 0x0300000000000000
 //XXXX pm_dll_value_0(RD) XXXX pm_dll_value_ck(RD) XXXX pm_dll_init_done(RD) XXXX pm_version(RD)

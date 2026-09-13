@@ -75,3 +75,9 @@
 #ifndef DDR_FREQ
 #define DDR_FREQ 400
 #endif
+
+/*
+ * The PMON ls2k build defines DDR3_DIMM: the soldered-down DDR3 on the
+ * 2K1000LA boards still runs the write-leveling paths guarded by it.
+ */
+#define DDR3_DIMM 1
