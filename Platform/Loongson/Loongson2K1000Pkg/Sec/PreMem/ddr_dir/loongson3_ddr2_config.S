@@ -2,64 +2,64 @@
     loongson3_ddr2_config.S
         used to set up ddr controllers MC0 and MC1
         and set up the memory space on L2 Xbar
-    input: s1--MC1 & MC0 DIMM info and Node ID
-    note: s1 is damaged by the end of this file
+    input: $s1--MC1 & MC0 DIMM info and Node ID
+    note: $s1 is damaged by the end of this file
     original: whd
     rewrite by Chen Xinke on 11/11/2010
     1: reorder the program
-    2: DIMM info and memory size is set according to s1[MC1&0_MEMSIZE]
+    2: DIMM info and memory size is set according to $s1[MC1&0_MEMSIZE]
     note: config L2 Xbar still need to be finished,currently only support limited MEMSIZE.
-    a5.0    raw
-    a5.2    add support for 4G memsize per MC, modify the L2-Xbar config manner of MC1
+    $a5.0    raw
+    $a5.2    add support for 4G memsize per MC, modify the L2-Xbar config manner of MC1
             to reduce code size.
-    a5.4    Modify L2 Xbar config reg code at Interleave mode to reduce code size
+    $a5.4    Modify L2 Xbar config reg code at Interleave mode to reduce code size
             new code:
             1. according to Memsize config open space
             2. config interleave bits
-    a5.6    Modify L2 Xbar address window configuration to new pmon-kernel interface.
+    $a5.6    Modify L2 Xbar address window configuration to new pmon-kernel interface.
             (default use NO_INTERLEAVE)
-    a5.8    Modify supported Interleave bit. Add Interleave support when each MC uses 1GB or 2GB.
+    $a5.8    Modify supported Interleave bit. Add Interleave support when each MC uses 1GB or 2GB.
     v2.0    Add support for 8GB per MC.
 ************************************/
 
 #######################################################
 /**************************
-0. s1 reset code
+0. $s1 reset code
 **************************/
 //set use which MC: 01-MC0; 10-MC1; 00-MC0&MC1
 #ifdef DEBUG_DDR_PARAM
     MM_PRINTSTR("Please input DDR SELLECT :\r\n[ 8]:MC1_ONLY\r\n[ 4]:MC0_ONLY\r\n");
-    li.d     t6, 0x00
-    bl     inputaddress    #input value stored in a4
+    li.d     $t6, 0x00
+    bl     inputaddress    #input value stored in $a4
     nop
-    li.d     t6, 0xc
-    and     a4, a4, t6
-    li.d     t6, 0xc
-    nor     t6, t6, zero
-    and     s1, s1, t6
-    or      s1, s1, a4
+    li.d     $t6, 0xc
+    and     $a4, $a4, $t6
+    li.d     $t6, 0xc
+    nor     $t6, $t6, $zero
+    and     $s1, $s1, $t6
+    or      $s1, $s1, $a4
 #endif
 
 #ifdef  AUTO_ARB_LEVEL
-//store memory system info into s3(dimm i2c addr)
+//store memory system info into $s3(dimm i2c addr)
 #ifdef  CHECK_ARB_LEVEL_DIMM
-    //store dimm i2c addr info to s3
-    srli.d    a2, s1, 16
-    li.d     a1, 0xffff
-    and     a2, a2, a1
+    //store dimm i2c addr info to $s3
+    srli.d    $a2, $s1, 16
+    li.d     $a1, 0xffff
+    and     $a2, $a2, $a1
     GET_NODE_ID_a1
-    slli.d    a1, a1, 4
-    slli.d    a2, a2, a1
-    or      s3, s3, a2
+    slli.d    $a1, $a1, 4
+    slli.d    $a2, $a2, $a1
+    or      $s3, $s3, $a2
 #endif
 
 #ifdef  DEBUG_AUTO_ARB_LEVEL
     MM_PRINTSTR("\r\ns3 = 0x");
-    srli.d    a0, s3, 32
+    srli.d    $a0, $s3, 32
     bl     mm_hexserial
     nop
     MM_PRINTSTR("__")
-    or    a0, s3, zero
+    or    $a0, $s3, $zero
     bl     mm_hexserial
     nop
     MM_PRINTSTR("\r\n")
@@ -72,13 +72,13 @@
 #endif
 
 #ifdef  PRINT_MSG
-    /* show value of s1 */
+    /* show value of $s1 */
     MM_PRINTSTR("\r\n\r\ns1 = 0x");
-    srli.d    a0, s1, 32
+    srli.d    $a0, $s1, 32
     bl     mm_hexserial
     nop
     MM_PRINTSTR("__")
-    or    a0, s1, zero
+    or    $a0, $s1, $zero
     bl     mm_hexserial
     nop
     MM_PRINTSTR("\r\n")
@@ -87,93 +87,93 @@
 #ifdef LSMCD3_2
 //for DDR3 RDIMM, if it has 2 rank, use only 1. temp code for 3A MC
     //check MC1 first
-    srli.d    t1, s1, 32
-    li.d     a1, 0xd0000000
-    and     a1, t1, a1
-    li.d     a0, 0xd0000000
-    bne     a1, a0, 1f      //not DDR3 RDIMM, do nothing
+    srli.d    $t1, $s1, 32
+    li.d     $a1, 0xd0000000
+    and     $a1, $t1, $a1
+    li.d     $a0, 0xd0000000
+    bne     $a1, $a0, 1f      //not DDR3 RDIMM, do nothing
     nop
-    li.d     t2, 0xff00
-    and     t2, t1, t2      //t2 store memsize
+    li.d     $t2, 0xff00
+    and     $t2, $t1, $t2      //$t2 store memsize
 
-    li.d     a1, 0x30000     //check slot 0 CS_MAP
-    and     a1, t1, a1
-    li.d     a0, 0x30000
-    bne     a1, a0, 2f      //not 2 rank
+    li.d     $a1, 0x30000     //check slot 0 CS_MAP
+    and     $a1, $t1, $a1
+    li.d     $a0, 0x30000
+    bne     $a1, $a0, 2f      //not 2 rank
     nop
     //slot 0 has 2 rank DIMM
-    li.d     a1, 0xfffdffff
-    and     t1, t1, a1      //clear cs 1
-    srli.d    t2, t2, 1       //half memsize
+    li.d     $a1, 0xfffdffff
+    and     $t1, $t1, $a1      //clear cs 1
+    srli.d    $t2, $t2, 1       //half memsize
 2:
-    li.d     a1, 0xc0000     //check slot 1 CS_MAP
-    and     a1, t1, a1
-    li.d     a0, 0xc0000
-    bne     a1, a0, 2f      //not 2 rank
+    li.d     $a1, 0xc0000     //check slot 1 CS_MAP
+    and     $a1, $t1, $a1
+    li.d     $a0, 0xc0000
+    bne     $a1, $a0, 2f      //not 2 rank
     nop
     //slot 1 has 2 rank DIMM
-    li.d     a1, 0xfff7ffff
-    and     t1, t1, a1      //clear cs 3
-    srli.d    t2, t2, 1       //half memsize
+    li.d     $a1, 0xfff7ffff
+    and     $t1, $t1, $a1      //clear cs 3
+    srli.d    $t2, $t2, 1       //half memsize
 2:
     //use reduced(if needed) memsize
-    li.d     a1, 0xffff00ff
-    and     t1, t1, a1
-    or      t1, t1, t2
+    li.d     $a1, 0xffff00ff
+    and     $t1, $t1, $a1
+    or      $t1, $t1, $t2
     //use modified infor for MC1
-    li.d     a1, 0xffffffff
-    and     s1, s1, a1
-    slli.d    t1, t1, 32
-    or      s1, s1, t1
+    li.d     $a1, 0xffffffff
+    and     $s1, $s1, $a1
+    slli.d    $t1, $t1, 32
+    or      $s1, $s1, $t1
 1:
     //check MC0
-    li.d     a1, 0xffffffff
-    and     t1, s1, a1
-    li.d     a1, 0xd0000000
-    and     a1, t1, a1
-    li.d     a0, 0xd0000000
-    bne     a1, a0, 1f      //not DDR3 RDIMM, do nothing
+    li.d     $a1, 0xffffffff
+    and     $t1, $s1, $a1
+    li.d     $a1, 0xd0000000
+    and     $a1, $t1, $a1
+    li.d     $a0, 0xd0000000
+    bne     $a1, $a0, 1f      //not DDR3 RDIMM, do nothing
     nop
-    li.d     t2, 0xff00
-    and     t2, t1, t2      //t2 store memsize
+    li.d     $t2, 0xff00
+    and     $t2, $t1, $t2      //$t2 store memsize
 
-    li.d     a1, 0x30000     //check slot 0 CS_MAP
-    and     a1, t1, a1
-    li.d     a0, 0x30000
-    bne     a1, a0, 2f      //not 2 rank
+    li.d     $a1, 0x30000     //check slot 0 CS_MAP
+    and     $a1, $t1, $a1
+    li.d     $a0, 0x30000
+    bne     $a1, $a0, 2f      //not 2 rank
     nop
     //slot 0 has 2 rank DIMM
-    li.d     a1, 0xfffdffff
-    and     t1, t1, a1      //clear cs 1
-    srli.d    t2, t2, 1       //half memsize
+    li.d     $a1, 0xfffdffff
+    and     $t1, $t1, $a1      //clear cs 1
+    srli.d    $t2, $t2, 1       //half memsize
 2:
-    li.d     a1, 0xc0000     //check slot 1 CS_MAP
-    and     a1, t1, a1
-    li.d     a0, 0xc0000
-    bne     a1, a0, 2f      //not 2 rank
+    li.d     $a1, 0xc0000     //check slot 1 CS_MAP
+    and     $a1, $t1, $a1
+    li.d     $a0, 0xc0000
+    bne     $a1, $a0, 2f      //not 2 rank
     nop
     //slot 1 has 2 rank DIMM
-    li.d     a1, 0xfff7ffff
-    and     t1, t1, a1      //clear cs 3
-    srli.d    t2, t2, 1       //half memsize
+    li.d     $a1, 0xfff7ffff
+    and     $t1, $t1, $a1      //clear cs 3
+    srli.d    $t2, $t2, 1       //half memsize
 2:
     //use reduced(if needed) memsize
-    li.d     a1, 0xffff00ff
-    and     t1, t1, a1
-    or      t1, t1, t2
+    li.d     $a1, 0xffff00ff
+    and     $t1, $t1, $a1
+    or      $t1, $t1, $t2
     //use modified infor for MC0
-    li.d     a1, 0xffffffff00000000
-    and     s1, s1, a1
-    or      s1, s1, t1
+    li.d     $a1, 0xffffffff00000000
+    and     $s1, $s1, $a1
+    or      $s1, $s1, $t1
 1:
 #if 1
-    /* show value of s1 */
-    MM_PRINTSTR("\r\nnew s1 = 0x");
-    srli.d    a0, s1, 32
+    /* show value of $s1 */
+    MM_PRINTSTR("\r\nnew $s1 = 0x");
+    srli.d    $a0, $s1, 32
     bl     mm_hexserial
     nop
     MM_PRINTSTR("__")
-    or    a0, s1, zero
+    or    $a0, $s1, $zero
     bl     mm_hexserial
     nop
     MM_PRINTSTR("\r\n")
@@ -184,66 +184,66 @@
 #ifdef DISABLE_DDR_A15
 //hot fix for lack of address pin A15 when use LSMC. For example RS780E R1.03
     //check MC1 first
-    or    t1, s1, zero  //store s1
-    srli.d    s1, s1, 32
+    or    $t1, $s1, $zero  //store $s1
+    srli.d    $s1, $s1, 32
     GET_SDRAM_TYPE
-    beqz    a1, 1f
+    beqz    $a1, 1f
     nop
     GET_ROW_SIZE
-    bnez    a1, 1f  //row size diff not 0, do nothing
+    bnez    $a1, 1f  //row size diff not 0, do nothing
     nop
     //set row_size diff to 1
-    li.d     a1, 1
-    slli.d    a1, a1, ROW_SIZE_OFFSET
-    or      s1, s1, a1
+    li.d     $a1, 1
+    slli.d    $a1, $a1, ROW_SIZE_OFFSET
+    or      $s1, $s1, $a1
     //half memsize
-    li.d     t2, 0xff00
-    and     t2, s1, t2      //t2 store memsize
-    srli.d    t2, t2, 1
-    li.d     a1, 0xffff00ff
-    and     s1, s1, a1
-    or      s1, s1, t2
+    li.d     $t2, 0xff00
+    and     $t2, $s1, $t2      //$t2 store memsize
+    srli.d    $t2, $t2, 1
+    li.d     $a1, 0xffff00ff
+    and     $s1, $s1, $a1
+    or      $s1, $s1, $t2
 1:
-    //reconstruct s1
-    li.d     a1, 0xffffffff
-    and     t1, t1, a1
-    slli.d    s1, s1, 32
-    or      s1, s1, t1
+    //reconstruct $s1
+    li.d     $a1, 0xffffffff
+    and     $t1, $t1, $a1
+    slli.d    $s1, $s1, 32
+    or      $s1, $s1, $t1
 
     //check MC0
-    or    t1, s1, zero
-    slli.d    s1, s1, 32
-    srli.d    s1, s1, 32
+    or    $t1, $s1, $zero
+    slli.d    $s1, $s1, 32
+    srli.d    $s1, $s1, 32
     GET_SDRAM_TYPE
-    beqz    a1, 1f
+    beqz    $a1, 1f
     nop
     GET_ROW_SIZE
-    bnez    a1, 1f  //row size diff not 0, do nothing
+    bnez    $a1, 1f  //row size diff not 0, do nothing
     nop
     //set row_size diff to 1
-    li.d     a1, 1
-    slli.d    a1, a1, ROW_SIZE_OFFSET
-    or      s1, s1, a1
+    li.d     $a1, 1
+    slli.d    $a1, $a1, ROW_SIZE_OFFSET
+    or      $s1, $s1, $a1
     //half memsize
-    li.d     t2, 0xff00
-    and     t2, s1, t2      //t2 store memsize
-    srli.d    t2, t2, 1
-    li.d     a1, 0xffff00ff
-    and     s1, s1, a1
-    or      s1, s1, t2
+    li.d     $t2, 0xff00
+    and     $t2, $s1, $t2      //$t2 store memsize
+    srli.d    $t2, $t2, 1
+    li.d     $a1, 0xffff00ff
+    and     $s1, $s1, $a1
+    or      $s1, $s1, $t2
 1:
-    //reconstruct s1
-    li.d     a1, 0xffffffff00000000
-    and     t1, t1, a1
-    or      s1, s1, t1
+    //reconstruct $s1
+    li.d     $a1, 0xffffffff00000000
+    and     $t1, $t1, $a1
+    or      $s1, $s1, $t1
 #if 1
-    /* show value of s1 */
-    MM_PRINTSTR("\r\nnew s1 = 0x");
-    srli.d    a0, s1, 32
+    /* show value of $s1 */
+    MM_PRINTSTR("\r\nnew $s1 = 0x");
+    srli.d    $a0, $s1, 32
     bl     mm_hexserial
     nop
     MM_PRINTSTR("__")
-    or    a0, s1, zero
+    or    $a0, $s1, $zero
     bl     mm_hexserial
     nop
     MM_PRINTSTR("\r\n")
@@ -252,67 +252,67 @@
 #endif
 
 #ifdef DEBUG_DDR_PARAM
-    MM_PRINTSTR("\r\nChange s1?:\r\n");
-    li.d     t6, 0x00
-    bl     inputaddress    #input value stored in a4
+    MM_PRINTSTR("\r\nChange $s1?:\r\n");
+    li.d     $t6, 0x00
+    bl     inputaddress    #input value stored in $a4
     nop
-    beqz    a4, 1f
+    beqz    $a4, 1f
     nop
-    or    s1, a4, zero
+    or    $s1, $a4, $zero
 1:
 #endif
 
-//make sure s1[3:2] is correctly set.
+//make sure $s1[3:2] is correctly set.
     GET_MC_SEL_BITS
-    li.d     a2, 3
-    bne     a1, a2, 1f
+    li.d     $a2, 3
+    bne     $a1, $a2, 1f
     nop
-//s1[3:2]=0b'11, clear to 0b'00
-    li.d     a2, 0xc
-    nor     a2, a2, zero
-    and     s1, s1, a2
+//$s1[3:2]=0b'11, clear to 0b'00
+    li.d     $a2, 0xc
+    nor     $a2, $a2, $zero
+    and     $s1, $s1, $a2
 1:
 /**************************
 1. 1. check NODE memory size.
 *  2. set MC0/1_ONLY if the following 2 conditions are satisfied:
-*     (1). s1[3:2]=0b'00
+*     (1). $s1[3:2]=0b'00
 *     (2). MC0 or MC1 MEMSIZE > 0.
 * when use AUTO_DDR_CONFIG, one MC may have no DIMM while the other has, in this case,
-* the code should.d set MC0_ONLY or MC1_ONLY in s1 automatically, because the code of
+* the code should.d set MC0_ONLY or MC1_ONLY in $s1 automatically, because the code of
 * configuring L2-Xbar will use this message.
 **************************/
     GET_MC0_ONLY
-    bnez    a1, 1f
+    bnez    $a1, 1f
     nop
     GET_MC1_ONLY
-    bnez    a1, 2f
+    bnez    $a1, 2f
     nop
-//s1[3:2]=0b'00
+//$s1[3:2]=0b'00
     //check memory size in this case
     GET_MC0_MEMSIZE
-    or    t5, a1, zero
+    or    $t5, $a1, $zero
     GET_MC1_MEMSIZE
-    add.d   a1, a1, t5
-    beqz    a1, 89f
+    add.d   $a1, $a1, $t5
+    beqz    $a1, 89f
     nop
-    li.d     t5, 0x20
-    beq  a1, t5, 99f;     bge     a1, t5, 89f;99:
+    li.d     $t5, 0x20
+    beq  $a1, $t5, 99f;     bge     $a1, $t5, 89f;99:
     nop
     GET_MC0_MEMSIZE
-    bnez    a1, 3f
+    bnez    $a1, 3f
     nop
     //MC0_MEMSIZE=0, MC1_MEMSIZE must !=0, set MC1_ONLY
-    li.d     t5, 0x8
-    or      s1, s1, t5
+    li.d     $t5, 0x8
+    or      $s1, $s1, $t5
     b       4f
     nop
 3:  //MC0_MEMSIZE!=0
     GET_MC1_MEMSIZE
-    bnez    a1, 4f
+    bnez    $a1, 4f
     nop
     //MC1_MEMSIZE=0 set use MC0_ONLY
-    li.d     t5, 0x4
-    or      s1, s1, t5
+    li.d     $t5, 0x4
+    or      $s1, $s1, $t5
     b       4f
     nop
 1:  //MC0_ONLY
@@ -322,15 +322,15 @@
 2:  //MC1_ONLY
     GET_MC1_MEMSIZE
 5:
-    beqz    a1, 89f
+    beqz    $a1, 89f
     nop
-    li.d     t5, 0x10
-    beq  a1, t5, 99f;     bge     a1, t5, 89f;99:
+    li.d     $t5, 0x10
+    beq  $a1, $t5, 99f;     bge     $a1, $t5, 89f;99:
     nop
 4:
 #if 0
     MM_PRINTSTR("\r\ns1 = 0x")
-    or    a0, s1, zero
+    or    $a0, $s1, $zero
     bl     mm_hexserial
     nop
     MM_PRINTSTR("\r\n")
@@ -342,23 +342,23 @@
 for single chip or multi-chip:
 t0: X-bar config base
 t2: chip configuration register location
-t0,t2 shouldn't be changed to the end of this file.
+$t0,$t2 shouldn't be changed to the end of this file.
 **********************/
     GET_NODE_ID_a0
-    li.d     t2, PHYS_TO_UNCACHED(0x1fe00000) //no use
-    li.d     t0, PHYS_TO_UNCACHED(0x1fe00000)
-    or      t2, t2, a0
-    or      t0, t0, a0
+    li.d     $t2, PHYS_TO_UNCACHED(0x1fe00000) //no use
+    li.d     $t0, PHYS_TO_UNCACHED(0x1fe00000)
+    or      $t2, $t2, $a0
+    or      $t0, $t0, $a0
 
-//init MC1 will damage MC0 s1 info
+//init MC1 will damage MC0 $s1 info
 //config MC0 if not define MC1_ONLY
 //-------------------------------------
 10:
     GET_MC1_ONLY
-    bnez    a1, 11f
+    bnez    $a1, 11f
     nop
 
-    li.d     t3, 0x0
+    li.d     $t3, 0x0
 #ifdef  AUTO_ARB_LEVEL
     bl     SET_AUTO_ARB_LEVEL_MARK
     nop
@@ -372,18 +372,18 @@ t0,t2 shouldn't be changed to the end of this file.
 //config MC1 if not define MC0_ONLY
 11:
     GET_MC0_ONLY
-    bnez    a1, 12f
+    bnez    $a1, 12f
     nop
 
-    li.d     t3, 0x1
+    li.d     $t3, 0x1
 
-    //shift MC1 DIMM info to low 32bit of s1
-    srli.d    t5, s1, 32
-    li.d     a1, 0xffff8000
-    and     t5, t5, a1
-    li.d     a1, 0xffffffff8000ffff
-    and     s1, s1, a1
-    or      s1, s1, t5
+    //shift MC1 DIMM info to low 32bit of $s1
+    srli.d    $t5, $s1, 32
+    li.d     $a1, 0xffff8000
+    and     $t5, $t5, $a1
+    li.d     $a1, 0xffffffff8000ffff
+    and     $s1, $s1, $a1
+    or      $s1, $s1, $t5
 
 #ifdef  AUTO_ARB_LEVEL
     bl     SET_AUTO_ARB_LEVEL_MARK
@@ -398,8 +398,8 @@ t0,t2 shouldn't be changed to the end of this file.
 12:
 /*******************************
  3. config L2 X-bar
-    code procedure: first, MC*_ONLY bits in s1 decides whether this MC is
-    used,then according to MC*_MEMSIZE bits in s1 decide memory size and how
+    code procedure: first, MC*_ONLY bits in $s1 decides whether this MC is
+    used,then according to MC*_MEMSIZE bits in $s1 decide memory size and how
     the L2 X-bar windows will be configured.
     note: currently,when use only 1 MC,support memory size: 512M, 1G, 2G, 3G, 4G;
       when use MC0&MC1 both, only support 1G, 2G or 4G Memory size of each Controller.
@@ -412,10 +412,10 @@ t0,t2 shouldn't be changed to the end of this file.
     nop
 
     GET_NODE_ID_a0
-    li.d     t2, PHYS_TO_UNCACHED(0x1fe00000) //no use
-    li.d     t0, PHYS_TO_UNCACHED(0x1fe00000)
-    or      t2, t2, a0
-    or      t0, t0, a0
+    li.d     $t2, PHYS_TO_UNCACHED(0x1fe00000) //no use
+    li.d     $t0, PHYS_TO_UNCACHED(0x1fe00000)
+    or      $t2, $t2, $a0
+    or      $t0, $t0, $a0
 
 
     //disable default pci window
@@ -425,7 +425,7 @@ t0,t2 shouldn't be changed to the end of this file.
     L2XBAR_DISABLE_WINDOW(0x18);
 
     GET_MC_SEL_BITS
-    beqz    a1, 1f
+    beqz    $a1, 1f
     nop
 /*Assume MC0_ONLY */
     GET_NODE_ID_a0;
@@ -435,7 +435,7 @@ t0,t2 shouldn't be changed to the end of this file.
                     0x00000000000000F0)
     MM_PRINTSTR("MC0 space open : 0x00000000 - 0x0FFFFFFF\r\n")
     GET_MC1_ONLY
-    beqz    a1, 2f
+    beqz    $a1, 2f
     nop
 /* MC1_ONLY */
     L2XBAR_RECONFIG_TO_MC1(0x10)
@@ -446,19 +446,19 @@ t0,t2 shouldn't be changed to the end of this file.
 #ifndef NO_INTERLEAVE
 //interleave first, if MC1 memsize != MC0 memsize, do NO_interleave
     GET_MC0_MEMSIZE
-    or    t5, a1, zero
+    or    $t5, $a1, $zero
     GET_MC1_MEMSIZE
-    bne     t5, a1, 1f
+    bne     $t5, $a1, 1f
     nop
     //ONLY 1GB, 2GB and 4GB each MC support interleave mode.
-    li.d     a1, 0x2
-    beq     t5, a1, 3f
+    li.d     $a1, 0x2
+    beq     $t5, $a1, 3f
     nop
-    li.d     a1, 0x4
-    beq     t5, a1, 3f
+    li.d     $a1, 0x4
+    beq     $t5, $a1, 3f
     nop
-    li.d     a1, 0x8
-    beq     t5, a1, 3f
+    li.d     $a1, 0x8
+    beq     $t5, $a1, 3f
     nop
     b       1f
     nop
@@ -497,41 +497,41 @@ t0,t2 shouldn't be changed to the end of this file.
 
 //config high memory windows
     GET_MC_SEL_BITS
-    beqz    a1, 84f
+    beqz    $a1, 84f
     nop
 /* Assume MC0_ONLY */
     GET_MC0_MEMSIZE
-    or    t5, a1, zero
+    or    $t5, $a1, $zero
     GET_MC1_ONLY
-    beqz    a1, 1f
+    beqz    $a1, 1f
     nop
     //MC1_ONLY
     GET_MC1_MEMSIZE
-    or    t5, a1, zero
+    or    $t5, $a1, $zero
 1:
 //use one MC only, currently only support 512M, 1G, 2G, 3G, 4G, 6G, 8G
-    or    a1, t5, zero
-    li.d     t5, 0x1
-    beq     a1, t5, 1f
+    or    $a1, $t5, $zero
+    li.d     $t5, 0x1
+    beq     $a1, $t5, 1f
     nop
-    li.d     t5, 0x2
-    beq     a1, t5, 2f
+    li.d     $t5, 0x2
+    beq     $a1, $t5, 2f
     nop
-    li.d     t5, 0x4
-    beq     a1, t5, 3f
+    li.d     $t5, 0x4
+    beq     $a1, $t5, 3f
     nop
-    li.d     t5, 0x6
-    beq     a1, t5, 4f
+    li.d     $t5, 0x6
+    beq     $a1, $t5, 4f
     nop
-    li.d     t5, 0x8
-    beq     a1, t5, 5f
+    li.d     $t5, 0x8
+    beq     $a1, $t5, 5f
     nop
-    li.d     t5, 0xc
-    beq     a1, t5, 6f
+    li.d     $t5, 0xc
+    beq     $a1, $t5, 6f
     nop
-    li.d     t5, 0x10
+    li.d     $t5, 0x10
     //temp code, MEM size >= 8G, use 8G only
-    bgeu    a1, t5, 7f
+    bgeu    $a1, $t5, 7f
     nop
     b       89f  //error condition
     nop
@@ -613,7 +613,7 @@ t0,t2 shouldn't be changed to the end of this file.
     nop
 81:
     GET_MC1_ONLY
-    beqz    a1, 81f
+    beqz    $a1, 81f
     nop
 /* MC1_ONLY */
     L2XBAR_RECONFIG_TO_MC1(0x20)
@@ -626,47 +626,47 @@ t0,t2 shouldn't be changed to the end of this file.
 #ifndef NO_INTERLEAVE
 //interleave first, if MC1 memsize != MC0 memsize, do NO_interleave
     GET_MC0_MEMSIZE
-    or    t5, a1, zero
+    or    $t5, $a1, $zero
     GET_MC1_MEMSIZE
-    bne     t5, a1, 85f
+    bne     $t5, $a1, 85f
     nop
 #if 0 // by xqch comment to support ls3a2h swiotlb
     //universal set, address start from memsize
     GET_NODE_ID_a0;
     //config mask
-    li.d     a2, 0xffffffffffffffff
-    slli.d    a2, a2, 28
+    li.d     $a2, 0xffffffffffffffff
+    slli.d    $a2, $a2, 28
 1:
-    slli.d    a2, a2, 1
-    srli.d    a1, a1, 1
-    bnez    a1, 1b
+    slli.d    $a2, $a2, 1
+    srli.d    $a1, $a1, 1
+    bnez    $a1, 1b
     nop
-    st.d      a2, t0, 0x60
-    st.d      a2, t0, 0x68
-    st.d      a2, t0, 0x70
-    st.d      a2, t0, 0x78
+    st.d      $a2, $t0, 0x60
+    st.d      $a2, $t0, 0x68
+    st.d      $a2, $t0, 0x70
+    st.d      $a2, $t0, 0x78
     //config base
     GET_MC0_MEMSIZE
-    slli.d    a2, a1, 30  //a2=a1*512M*2
-    or      a2, a2, a0
-    st.d      a2, t0, 0x20
-    st.d      a2, t0, 0x28
-    slli.d    a1, a1, 29  //a1=a1*512M
-    or      a2, a2, a1  //a2=a1+a2
-    or      a2, a2, a0
-    st.d      a2, t0, 0x30
-    st.d      a2, t0, 0x38
+    slli.d    $a2, $a1, 30  //$a2=$a1*512M*2
+    or      $a2, $a2, $a0
+    st.d      $a2, $t0, 0x20
+    st.d      $a2, $t0, 0x28
+    slli.d    $a1, $a1, 29  //$a1=$a1*512M
+    or      $a2, $a2, $a1  //$a2=$a1+$a2
+    or      $a2, $a2, $a0
+    st.d      $a2, $t0, 0x30
+    st.d      $a2, $t0, 0x38
     MM_PRINTSTR("DDR all space open\r\n")
 #else
 /* ONLY 1GB, 2GB and 4G has INTERLEAVE mode now */
-    li.d     t5, 0x2
-    beq     a1, t5, 1f
+    li.d     $t5, 0x2
+    beq     $a1, $t5, 1f
     nop
-    li.d     t5, 0x4
-    beq     a1, t5, 2f
+    li.d     $t5, 0x4
+    beq     $a1, $t5, 2f
     nop
-    li.d     t5, 0x8
-    beq     a1, t5, 3f
+    li.d     $t5, 0x8
+    beq     $a1, $t5, 3f
     nop
     b       85f
     nop
@@ -761,29 +761,29 @@ t0,t2 shouldn't be changed to the end of this file.
 //NO_INTERLEAVE
 //only support 2G(1+1),3G(1+2 or 2+1),4G(2+2),6G(2+4 or 4+2),8G(4+4),12G(8+4 or 4+8),16G(8+8).
     GET_MC0_MEMSIZE
-    li.d     t5, 0x2
-    beq     a1, t5, 11f
+    li.d     $t5, 0x2
+    beq     $a1, $t5, 11f
     nop
-    li.d     t5, 0x4
-    beq     a1, t5, 12f
+    li.d     $t5, 0x4
+    beq     $a1, $t5, 12f
     nop
-    li.d     t5, 0x8
-    beq     a1, t5, 13f
+    li.d     $t5, 0x8
+    beq     $a1, $t5, 13f
     nop
-    li.d     t5, 0x10
+    li.d     $t5, 0x10
     //temp code. >= 8G, use 8G only
-    bgeu    a1, t5, 14f
+    bgeu    $a1, $t5, 14f
     nop
     b       89f
     nop
 11:     //MC0_SIZE_1G
     GET_MC1_MEMSIZE
-    li.d     t5, 0x2
-    beq     a1, t5, 1f
+    li.d     $t5, 0x2
+    beq     $a1, $t5, 1f
     nop
-    li.d     t5, 0x4
+    li.d     $t5, 0x4
     //temp code. >= 2G, use 2G only
-    bgeu    a1, t5, 2f
+    bgeu    $a1, $t5, 2f
     nop
     b       89f
     nop
@@ -826,18 +826,18 @@ t0,t2 shouldn't be changed to the end of this file.
 
 12:     //MC0_SIZE_2G
     GET_MC1_MEMSIZE
-    li.d     t5, 0x2
-    beq     a1, t5, 1f
+    li.d     $t5, 0x2
+    beq     $a1, $t5, 1f
     nop
-    li.d     t5, 0x4
-    beq     a1, t5, 2f
+    li.d     $t5, 0x4
+    beq     $a1, $t5, 2f
     nop
-    li.d     t5, 0x8
-    beq     a1, t5, 3f
+    li.d     $t5, 0x8
+    beq     $a1, $t5, 3f
     nop
-    li.d     t5, 0x10
+    li.d     $t5, 0x10
     //temp code. >= 8G, use 8G only
-    bgeu    a1, t5, 4f
+    bgeu    $a1, $t5, 4f
     nop
     b       89f
     nop
@@ -920,15 +920,15 @@ t0,t2 shouldn't be changed to the end of this file.
 
 13:     //MC0_SIZE_4G
     GET_MC1_MEMSIZE
-    li.d     t5, 0x4
-    beq     a1, t5, 1f
+    li.d     $t5, 0x4
+    beq     $a1, $t5, 1f
     nop
-    li.d     t5, 0x8
-    beq     a1, t5, 2f
+    li.d     $t5, 0x8
+    beq     $a1, $t5, 2f
     nop
-    li.d     t5, 0x10
+    li.d     $t5, 0x10
     //temp code. >= 8G, use 8G only
-    bgeu    a1, t5, 3f
+    bgeu    $a1, $t5, 3f
     nop
     b       89f
     nop
@@ -983,15 +983,15 @@ t0,t2 shouldn't be changed to the end of this file.
 
 14:     //MC0_SIZE_8G
     GET_MC1_MEMSIZE
-    li.d     t5, 0x4
-    beq     a1, t5, 1f
+    li.d     $t5, 0x4
+    beq     $a1, $t5, 1f
     nop
-    li.d     t5, 0x8
-    beq     a1, t5, 2f
+    li.d     $t5, 0x8
+    beq     $a1, $t5, 2f
     nop
-    li.d     t5, 0x10
+    li.d     $t5, 0x10
     //temp code. >= 8G, use 8G only
-    bgeu    a1, t5, 3f
+    bgeu    $a1, $t5, 3f
     nop
     b       89f
     nop
@@ -1072,38 +1072,38 @@ t0,t2 shouldn't be changed to the end of this file.
  4. set msize for this NODE(if the memsize is supported)
 ******************************/
     GET_MC0_ONLY
-    beqz    a1, 1f
+    beqz    $a1, 1f
     nop
 //use MC0 only
     GET_MC0_MEMSIZE
-    or    t5, a1, zero
+    or    $t5, $a1, $zero
     b       2f
     nop
 1:
     GET_MC1_ONLY
-    beqz    a1, 1f
+    beqz    $a1, 1f
     nop
 //use MC1 only
     GET_MC1_MEMSIZE
-    or    t5, a1, zero
+    or    $t5, $a1, $zero
     b       2f
     nop
 1:
 //use MC0&MC1
     GET_MC0_MEMSIZE
-    or    t5, a1, zero
+    or    $t5, $a1, $zero
     GET_MC1_MEMSIZE
-    add.d   t5, t5, a1
+    add.d   $t5, $t5, $a1
 2:
     GET_NODE_ID_a0;
-    srli.d    a0, a0, 44  //because of the macro define
-    slli.d    a0, a0, 3   //a0=a0*8
-    sll.d    t5, t5, a0
-    or      msize, msize, t5
+    srli.d    $a0, $a0, 44  //because of the macro define
+    slli.d    $a0, $a0, 3   //$a0=$a0*8
+    sll.d    $t5, $t5, $a0
+    or      msize, msize, $t5
 
 #ifdef  PRINT_MSG
     MM_PRINTSTR("\r\nmsize = 0x")
-    or    a0, msize, zero
+    or    $a0, msize, $zero
     bl     mm_hexserial
     nop
     MM_PRINTSTR("\r\n")

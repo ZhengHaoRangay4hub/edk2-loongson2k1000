@@ -36,8 +36,8 @@ ASM_PFX(DdrEntryAsm):
  *
  * NOTE: All ddr code is based on the mips-ls2k. We translate mips to loongarch
  *       with the following changes:
- *           1. Replace `v0/v1/t9` with `a4/a5/a6`.
- *           2. Use `tp` to store a temporary value as 'at'.
+ *           1. Replace `v0/v1/t9` with `$a4/$a5/$a6`.
+ *           2. Use `$tp` to store a temporary value as 'at'.
  *           3. Temporary use of MM_PRINTSTR to avoid damaging A4, A5,
  *               mm_hexserial[64], and so on.
  *           4. Deleted some temporarily unnecessary files.
@@ -47,143 +47,143 @@ ASM_PFX(DdrEntryAsm):
 
     MM_PRINTSTR("\r\nStart Init Memory, wait a while......\r\n")
 ####################################
-    or    msize, zero, zero
-    or    s3, zero, zero
-//!!!!important--s1 must be correctly set
+    or    msize, $zero, $zero
+    or    $s3, $zero, $zero
+//!!!!important--$s1 must be correctly set
 
     MM_PRINTSTR("NODE 0 MEMORY CONFIG BEGIN\r\n")
 #ifdef  AUTO_DDR_CONFIG
-    li.d     s1, 0xff100004  //set use MC1 or MC0 or MC1/0 and give All device id
+    li.d     $s1, 0xff100004  //set use MC1 or MC0 or MC1/0 and give All device id
 #else
-	//li.d     s1, 0xc2e30400c2e30404
+	//li.d     $s1, 0xc2e30400c2e30404
 	#ifdef DDR_S1
-	li.d     s1, DDR_S1
+	li.d     $s1, DDR_S1
 	#else
-	li.d     s1, 0xf0a31004
+	li.d     $s1, 0xf0a31004
 	#endif
 #endif
 #include "ddr_dir/loongson3_ddr2_config.S"
 
 //close default internal mapping in ddr controller
-	li.d      t0, PHYS_TO_UNCACHED(0x1fe00424)
-	ld.b      a0, t0, 0x1
-	andi     a0, a0, 0xfd
-	st.b      a0, t0, 0x1
+	li.d      $t0, PHYS_TO_UNCACHED(0x1fe00424)
+	ld.b      $a0, $t0, 0x1
+	andi     $a0, $a0, 0xfd
+	st.b      $a0, $t0, 0x1
 	dbar 0
 
-	li.d      t0, PHYS_TO_UNCACHED(0x1fe00420)
-	ld.d      a0, t0, 0x0
-	or    t6, a0, zero
-	srli.d    a0, t6, 32
+	li.d      $t0, PHYS_TO_UNCACHED(0x1fe00420)
+	ld.d      $a0, $t0, 0x0
+	or    $t6, $a0, $zero
+	srli.d    $a0, $t6, 32
 	bl     mm_hexserial
 	nop
-	or    a0, t6, zero
+	or    $a0, $t6, $zero
 	bl     mm_hexserial
 	nop
 	MM_PRINTSTR("\r\n")
 
 /* test memory */
-    li.d      t0, 0x9000000000000000
-    li.d     a0, 0x5555555555555555
-    st.d      a0, t0, 0x0
-    li.d     a0, 0xaaaaaaaaaaaaaaaa
-    st.d      a0, t0, 0x8
-    li.d     a0, 0x3333333333333333
-    st.d      a0, t0, 0x10
-    li.d     a0, 0xcccccccccccccccc
-    st.d      a0, t0, 0x18
-    li.d     a0, 0x7777777777777777
-    st.d      a0, t0, 0x20
-    li.d     a0, 0x8888888888888888
-    st.d      a0, t0, 0x28
-    li.d     a0, 0x1111111111111111
-    st.d      a0, t0, 0x30
-    li.d     a0, 0xeeeeeeeeeeeeeeee
-    st.d      a0, t0, 0x38
+    li.d      $t0, 0x9000000000000000
+    li.d     $a0, 0x5555555555555555
+    st.d      $a0, $t0, 0x0
+    li.d     $a0, 0xaaaaaaaaaaaaaaaa
+    st.d      $a0, $t0, 0x8
+    li.d     $a0, 0x3333333333333333
+    st.d      $a0, $t0, 0x10
+    li.d     $a0, 0xcccccccccccccccc
+    st.d      $a0, $t0, 0x18
+    li.d     $a0, 0x7777777777777777
+    st.d      $a0, $t0, 0x20
+    li.d     $a0, 0x8888888888888888
+    st.d      $a0, $t0, 0x28
+    li.d     $a0, 0x1111111111111111
+    st.d      $a0, $t0, 0x30
+    li.d     $a0, 0xeeeeeeeeeeeeeeee
+    st.d      $a0, $t0, 0x38
 
 
 	MM_PRINTSTR("The uncache data is:\r\n")
-	li.d     t1, 8
-	li.d     t5, PHYS_TO_UNCACHED(0x00000000)
+	li.d     $t1, 8
+	li.d     $t5, PHYS_TO_UNCACHED(0x00000000)
 1:
-	ld.d      t6, t5, 0x0
-	or    a0, t5, zero
-	andi     a0, a0, 0xfff
+	ld.d      $t6, $t5, 0x0
+	or    $a0, $t5, $zero
+	andi     $a0, $a0, 0xfff
 	bl     mm_hexserial
 	nop
 	MM_PRINTSTR(":  ")
-	srli.d    a0, t6, 32
+	srli.d    $a0, $t6, 32
 	bl     mm_hexserial
 	nop
-	or    a0, t6, zero
+	or    $a0, $t6, $zero
 	bl     mm_hexserial
 	nop
 	MM_PRINTSTR("\r\n")
 
-	addi.d  t1, t1, -1
-	addi.d  t5, t5, 8
-	bnez    t1, 1b
+	addi.d  $t1, $t1, -1
+	addi.d  $t5, $t5, 8
+	bnez    $t1, 1b
 	nop
 
 	MM_PRINTSTR("The cached  data is:\r\n")
-	li.d     t1, 8
-	li.d     t5, 0x9000000000000000
+	li.d     $t1, 8
+	li.d     $t5, 0x9000000000000000
 1:
-	ld.d      t6, t5, 0x0
-	or    a0, t5, zero
-	andi     a0, a0, 0xfff
+	ld.d      $t6, $t5, 0x0
+	or    $a0, $t5, $zero
+	andi     $a0, $a0, 0xfff
 	bl     mm_hexserial
 	nop
 	MM_PRINTSTR(":  ")
-	srli.d    a0, t6, 32
+	srli.d    $a0, $t6, 32
 	bl     mm_hexserial
 	nop
-	or    a0, t6, zero
+	or    $a0, $t6, $zero
 	bl     mm_hexserial
 	nop
 	MM_PRINTSTR("\r\n")
 
-	addi.d  t1, t1, -1
-	addi.d  t5, t5, 8
-	bnez    t1, 1b
+	addi.d  $t1, $t1, -1
+	addi.d  $t5, $t5, 8
+	bnez    $t1, 1b
 	nop
 ##########################################
 #ifdef  DEBUG_DDR
 	MM_PRINTSTR("\r\nDo test?(0xf: skip): ")
 	bl     inputaddress
 	nop
-	andi     a4, a4, 0xf
-	li.d     a1, 0x1
-	bgt     a4, a1, back_start
+	andi     $a4, $a4, 0xf
+	li.d     $a1, 0x1
+	bgt     $a4, $a1, back_start
 	nop
-	li.d     s1, 0x0010000080000000
-	MM_PRINTSTR("\r\ndefault s1 = 0x");
-	srli.d    a0, s1, 32
+	li.d     $s1, 0x0010000080000000
+	MM_PRINTSTR("\r\ndefault $s1 = 0x");
+	srli.d    $a0, $s1, 32
 	bl     mm_hexserial
 	nop
 	MM_PRINTSTR("__")
-	or    a0, s1, zero
+	or    $a0, $s1, $zero
 	bl     mm_hexserial
 	nop
-	MM_PRINTSTR("\r\nChange test param s1(0: skip)?: ")
+	MM_PRINTSTR("\r\nChange test param $s1(0: skip)?: ")
 	bl     inputaddress
 	nop
-	beqz    a4, 1f
+	beqz    $a4, 1f
 	nop
-	or    s1, a4, zero
+	or    $s1, $a4, $zero
 1:
-	li.d     t1, 0x0010
+	li.d     $t1, 0x0010
 	bl     test_mem
 	nop
-	or    t1, a4, zero
+	or    $t1, $a4, $zero
 	MM_PRINTSTR("\r\n")
-	srli.d    a0, t1, 32
+	srli.d    $a0, $t1, 32
 	bl     mm_hexserial
 	nop
-	or    a0, t1, zero
+	or    $a0, $t1, $zero
 	bl     mm_hexserial
 	nop
-	beqz    t1, back_start
+	beqz    $t1, back_start
 	nop
 	MM_PRINTSTR("  Error found!!\r\n")
 

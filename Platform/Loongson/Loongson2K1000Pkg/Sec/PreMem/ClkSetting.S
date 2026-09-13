@@ -89,106 +89,106 @@ ATTENTION:
 
 	MM_PRINTSTR ("Soft CLK SEL adjust begin\r\n")
 
-	li.d	t0, PHYS_TO_UNCACHED(0x1fe00480)
-	li.d	t1, (0x1 << 19) 	//power down pll L1 first
-	st.d	t1, t0, 0
-	li.d	t1, (L1_LOOPC << 32) | (L1_DIV << 42) | (L1_REFC << 26) | (0x3 << 10) | (0x1 << 7)
-	li.d	t2, L2_DIV
-	st.d	t1, t0, 0
-	st.d	t2, t0, 8
-	ori	t1, t1, PLL_L1_ENA
-	st.d    t1, t0, 0
+	li.d	$t0, PHYS_TO_UNCACHED(0x1fe00480)
+	li.d	$t1, (0x1 << 19) 	//power down pll L1 first
+	st.d	$t1, $t0, 0
+	li.d	$t1, (L1_LOOPC << 32) | (L1_DIV << 42) | (L1_REFC << 26) | (0x3 << 10) | (0x1 << 7)
+	li.d	$t2, L2_DIV
+	st.d	$t1, $t0, 0
+	st.d	$t2, $t0, 8
+	ori	$t1, $t1, PLL_L1_ENA
+	st.d    $t1, $t0, 0
 
 11:
-	ld.d	a0, t0, 0
-	li.d	a1, PLL_L1_LOCKED
-	and	a0, a1, a0
-	beqz	a0, 11b //wait_locked_sys
+	ld.d	$a0, $t0, 0
+	li.d	$a1, PLL_L1_LOCKED
+	and	$a0, $a1, $a0
+	beqz	$a0, 11b //wait_locked_sys
 	nop
 
-	ld.d	a0, t0, 0
-	ori     a0, a0, PLL_CHANG_COMMIT
-	st.d    a0, t0, 0
+	ld.d	$a0, $t0, 0
+	ori     $a0, $a0, PLL_CHANG_COMMIT
+	st.d    $a0, $t0, 0
 
 	bl     hexserial
 	nop
 
 	MM_PRINTSTR ("\r\nMEM        :")
 
-	li.d	t0, PHYS_TO_UNCACHED(0x1fe00490)
-	li.d	t1, (0x1 << 19) 	//power down pll  first
-	st.d	t1, t0, 0
-	li.d    t1, (DDR_DIV << 42) | (DDR_REFC << 26) | (DDR_LOOPC << 32) | (0x3 << 10) | (0x1 << 7)
-	li.d	t2, (GPU_DIV_L2 << 22) | (DDR_DIV_L2) | (HDA_DIV_L2 << 44)
-	st.d	t1, t0, 0
-	st.d	t2, t0, 0x8
-	ori	t1, t1, PLL_L1_ENA
-	st.d    t1, t0, 0
+	li.d	$t0, PHYS_TO_UNCACHED(0x1fe00490)
+	li.d	$t1, (0x1 << 19) 	//power down pll  first
+	st.d	$t1, $t0, 0
+	li.d    $t1, (DDR_DIV << 42) | (DDR_REFC << 26) | (DDR_LOOPC << 32) | (0x3 << 10) | (0x1 << 7)
+	li.d	$t2, (GPU_DIV_L2 << 22) | (DDR_DIV_L2) | (HDA_DIV_L2 << 44)
+	st.d	$t1, $t0, 0
+	st.d	$t2, $t0, 0x8
+	ori	$t1, $t1, PLL_L1_ENA
+	st.d    $t1, $t0, 0
 
 21:
-	ld.w	a0, t0, 0
-	li.w    a1, PLL_MEM_LOCKED
-	and     a0, a0, a1
-	beqz    a0, 21b //wait_locked_ddr
+	ld.w	$a0, $t0, 0
+	li.w    $a1, PLL_MEM_LOCKED
+	and     $a0, $a0, $a1
+	beqz    $a0, 21b //wait_locked_ddr
 	nop
 
-	ld.w	a0, t0, 0
-	ori	a0, a0, 0x3
-	st.w	a0, t0, 0
+	ld.w	$a0, $t0, 0
+	ori	$a0, $a0, 0x3
+	st.w	$a0, $t0, 0
 
 	bl     hexserial
 	nop
 
 	MM_PRINTSTR ("\r\nDC        :")
 
-	li.d	t0, PHYS_TO_UNCACHED(0x1fe004a0)
-	li.w	t1, (0x1 << 19) 	//power down pll  first
-	st.d	t1, t0, 0
-	li.d    t1, (DC_DIV << 42) | (DC_REFC << 26) | (DC_LOOPC << 32) | (0x3 << 10) | (0x1 << 7)
-	li.d	t2, (GMAC_DIV << 22) | (DC_DIV_L2)
-	st.d	t1, t0, 0
-	st.d	t2, t0, 0x8
-	ori	t1, t1, PLL_L1_ENA
-	st.d    t1, t0, 0
+	li.d	$t0, PHYS_TO_UNCACHED(0x1fe004a0)
+	li.w	$t1, (0x1 << 19) 	//power down pll  first
+	st.d	$t1, $t0, 0
+	li.d    $t1, (DC_DIV << 42) | (DC_REFC << 26) | (DC_LOOPC << 32) | (0x3 << 10) | (0x1 << 7)
+	li.d	$t2, (GMAC_DIV << 22) | (DC_DIV_L2)
+	st.d	$t1, $t0, 0
+	st.d	$t2, $t0, 0x8
+	ori	$t1, $t1, PLL_L1_ENA
+	st.d    $t1, $t0, 0
 
 21:
-	ld.w	a0, t0, 0
-	li.w    a1, PLL_MEM_LOCKED
-	and     a0, a0, a1
-	beqz    a0, 21b //wait_locked_ddr
+	ld.w	$a0, $t0, 0
+	li.w    $a1, PLL_MEM_LOCKED
+	and     $a0, $a0, $a1
+	beqz    $a0, 21b //wait_locked_ddr
 	nop
 
 	bl	initserial_later
 
-	ld.w	a0, t0, 0
-	ori     a0, a0, 0x3
-	st.w	a0, t0, 0
+	ld.w	$a0, $t0, 0
+	ori     $a0, $a0, 0x3
+	st.w	$a0, $t0, 0
 
 	bl     hexserial
 	nop
 
 	MM_PRINTSTR ("\r\nPIX0        :")
 
-	li.d	t0, PHYS_TO_UNCACHED(0x1fe004b0)		//pll_pix0
-	li.w	t1, (0x1 << 19) 	//power down pll  first
-	st.d	t1, t0, 0
-	li.d    t1, (PIX0_DIV << 42) | (PIX0_REFC << 26) | (PIX0_LOOPC << 32) | (0x3 << 10) | (0x1 << 7)
-	li.d	t2, PIX0_DIV_L2
-	st.d	t1, t0, 0
-	st.d	t2, t0, 0x8
-	ori	t1, t1, PLL_L1_ENA
-	st.d    t1, t0, 0
+	li.d	$t0, PHYS_TO_UNCACHED(0x1fe004b0)		//pll_pix0
+	li.w	$t1, (0x1 << 19) 	//power down pll  first
+	st.d	$t1, $t0, 0
+	li.d    $t1, (PIX0_DIV << 42) | (PIX0_REFC << 26) | (PIX0_LOOPC << 32) | (0x3 << 10) | (0x1 << 7)
+	li.d	$t2, PIX0_DIV_L2
+	st.d	$t1, $t0, 0
+	st.d	$t2, $t0, 0x8
+	ori	$t1, $t1, PLL_L1_ENA
+	st.d    $t1, $t0, 0
 
 21:
-	ld.w    a0, t0, 0
-	li.w    a1, PLL_MEM_LOCKED
-	and     a0, a0, a1
-	beqz    a0, 21b
+	ld.w    $a0, $t0, 0
+	li.w    $a1, PLL_MEM_LOCKED
+	and     $a0, $a0, $a1
+	beqz    $a0, 21b
 	nop
 
-	ld.w    a0, t0, 0
-	ori     a0, a0, 0x1
-	st.w    a0, t0, 0
+	ld.w    $a0, $t0, 0
+	ori     $a0, $a0, 0x1
+	st.w    $a0, $t0, 0
 
 	bl     hexserial
 	nop
@@ -196,26 +196,26 @@ ATTENTION:
 	MM_PRINTSTR ("\r\nPIX1        :")
 
 
-	li.d	t0, PHYS_TO_UNCACHED(0x1fe004c0)		//pll_pix1
-	li.w	t1, (0x1 << 19) 	//power down pll  first
-	st.d	t1, t0, 0
-	li.d    t1, (PIX1_DIV << 42) | (PIX1_REFC << 26) | (PIX1_LOOPC << 32) | (0x3 << 10) | (0x1 << 7)
-	li.d	t2, PIX1_DIV_L2
-	st.d	t1, t0, 0
-	st.d	t2, t0, 0x8
-	ori	t1, t1, PLL_L1_ENA
-	st.d    t1, t0, 0
+	li.d	$t0, PHYS_TO_UNCACHED(0x1fe004c0)		//pll_pix1
+	li.w	$t1, (0x1 << 19) 	//power down pll  first
+	st.d	$t1, $t0, 0
+	li.d    $t1, (PIX1_DIV << 42) | (PIX1_REFC << 26) | (PIX1_LOOPC << 32) | (0x3 << 10) | (0x1 << 7)
+	li.d	$t2, PIX1_DIV_L2
+	st.d	$t1, $t0, 0
+	st.d	$t2, $t0, 0x8
+	ori	$t1, $t1, PLL_L1_ENA
+	st.d    $t1, $t0, 0
 
 21:
-	ld.w    a0, t0, 0
-	li.w    a1, PLL_MEM_LOCKED
-	and     a0, a0, a1
-	beqz    a0, 21b
+	ld.w    $a0, $t0, 0
+	li.w    $a1, PLL_MEM_LOCKED
+	and     $a0, $a0, $a1
+	beqz    $a0, 21b
 	nop
 
-	ld.w    a0, t0, 0
-	ori     a0, a0, 0x1
-	st.w    a0, t0, 0
+	ld.w    $a0, $t0, 0
+	ori     $a0, $a0, 0x1
+	st.w    $a0, $t0, 0
 
 	bl     hexserial
 	nop
