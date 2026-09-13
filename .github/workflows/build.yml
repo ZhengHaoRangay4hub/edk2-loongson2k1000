@@ -29,8 +29,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            gcc g++ make python3 python3-pip uuid-dev nasm iasl device-tree-compiler \
-            gcc-loongarch64-linux-gnu binutils-loongarch64-linux-gnu
+            gcc g++ make python3 python3-pip uuid-dev nasm iasl device-tree-compiler curl xz-utils
+          # Loongson official LoongArch64 cross toolchain (gcc 13.2 / binutils 2.41)
+          curl -sL -o /tmp/cross-tools.tar.xz \
+            https://github.com/loongson/build-tools/releases/download/2023.08.08/x86_64-cross-tools-loongarch64-binutils_2.41-gcc_13.2.0.tar.xz
+          sudo mkdir -p /opt/loongarch64-cross-toolchain
+          sudo tar -xf /tmp/cross-tools.tar.xz -C /opt/loongarch64-cross-toolchain
+          echo "/opt/loongarch64-cross-toolchain/cross-tools/bin" >> "$GITHUB_PATH"
 
       - name: Overlay Loongson2K1000Pkg into edk2 tree
         run: |
@@ -53,7 +58,7 @@ jobs:
           export WORKSPACE=$PWD
           export PACKAGES_PATH=$WORKSPACE
           export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
-          export GCC_LOONGARCH64_PREFIX=loongarch64-linux-gnu-
+          export GCC_LOONGARCH64_PREFIX=loongarch64-unknown-linux-gnu-
           source edksetup.sh BaseTools
           build -b ${{ matrix.target }} -t GCC -a LOONGARCH64 \
             -p Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dsc \
@@ -65,7 +70,7 @@ jobs:
           export WORKSPACE=$PWD
           export PACKAGES_PATH=$WORKSPACE
           export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
-          export GCC_LOONGARCH64_PREFIX=loongarch64-linux-gnu-
+          export GCC_LOONGARCH64_PREFIX=loongarch64-unknown-linux-gnu-
           source edksetup.sh BaseTools
           build -b ${{ matrix.target }} -t GCC -a LOONGARCH64 \
             -p OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc \
