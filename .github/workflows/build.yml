@@ -43,7 +43,7 @@ jobs:
           cp -r Platform/Loongson/Loongson2K1000Pkg edk2/Platform/Loongson/
           # compile the platform DTB before the build consumes it
           D=edk2/Platform/Loongson/Loongson2K1000Pkg/Dts
-          cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I $D \
+          cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I $D/include \
               $D/ls2k1000-la.dts | \
             dtc -I dts -O dtb -o $D/ls2k1000-la.dtb -
 
