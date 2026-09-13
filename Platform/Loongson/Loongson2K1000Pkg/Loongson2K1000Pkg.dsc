@@ -479,7 +479,9 @@
       NULL|ShellPkg/Library/UefiShellLevel3CommandsLib/UefiShellLevel3CommandsLib.inf
       NULL|ShellPkg/Library/UefiShellDriver1CommandsLib/UefiShellDriver1CommandsLib.inf
       NULL|ShellPkg/Library/UefiShellInstall1CommandsLib/UefiShellInstall1CommandsLib.inf
-      # network command libs dropped: no NIC stack in firmware yet      # network command libs dropped: no NIC stack in firmware yet      NULL|ShellPkg/Library/UefiShellAcpiViewCommandLib/UefiShellAcpiViewCommandLib.inf
+      NULL|ShellPkg/Library/UefiShellAcpiViewCommandLib/UefiShellAcpiViewCommandLib.inf
+      # network command libs dropped: NetLib needs a NIC stack we do not ship yet
+      BcfgCommandLib|ShellPkg/Library/UefiShellBcfgCommandLib/UefiShellBcfgCommandLib.inf
       PcdLib|MdePkg/Library/DxePcdLib/DxePcdLib.inf
   }
   ShellPkg/DynamicCommand/DpDynamicCommand/DpDynamicCommand.inf {
