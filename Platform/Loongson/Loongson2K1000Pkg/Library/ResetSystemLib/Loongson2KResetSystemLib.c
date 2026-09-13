@@ -45,7 +45,7 @@ LoongsonShutdown (
 /**
   Resets the entire platform.
 **/
-EFI_STATUS
+VOID
 EFIAPI
 ResetSystem (
   IN EFI_RESET_TYPE  ResetType,
@@ -55,24 +55,23 @@ ResetSystem (
   )
 {
   switch (ResetType) {
-    case EfiResetPlatformSpecific:
-    case EfiResetWarm:
-    case EfiResetCold:
-      LoongsonWarmReset ();
-      break;
-
     case EfiResetShutdown:
       LoongsonShutdown ();
       break;
 
+    case EfiResetPlatformSpecific:
+    case EfiResetWarm:
+    case EfiResetCold:
     default:
-      return EFI_INVALID_PARAMETER;
+      //
+      // Unknown reset types fall back to a warm reset.
+      //
+      LoongsonWarmReset ();
+      break;
   }
 
   //
   // If the reset fails, just hang.
   //
   CpuDeadLoop ();
-
-  return EFI_SUCCESS;
 }

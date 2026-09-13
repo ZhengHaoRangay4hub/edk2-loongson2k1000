@@ -59,7 +59,7 @@ PublishFdtConfigurationTable (
 
   Fdt = *(VOID **)((UINT8 *)GuidHob + sizeof (EFI_HOB_GUID_TYPE));
   if (Fdt != NULL) {
-    gBS->InstallConfigurationTable (&mFdtTableGuid, Fdt);
+    gBS->InstallConfigurationTable ((EFI_GUID *)&mFdtTableGuid, Fdt);
   }
 }
 
@@ -1003,7 +1003,6 @@ PlatformBootManagerAfterConsole (
   VOID
   )
 {
-  RETURN_STATUS  Status;
   BOOLEAN        Uninstall;
   BOOLEAN        ShellEnabled;
 
