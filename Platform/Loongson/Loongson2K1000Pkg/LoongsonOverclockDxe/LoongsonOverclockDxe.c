@@ -18,6 +18,8 @@
 #include <Library/HiiLib.h>
 #include <Library/IoLib.h>
 #include <Library/MemoryAllocationLib.h>
+#include <Library/PrintLib.h>
+#include <Library/UefiHiiServicesLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 #include <Library/UefiLib.h>
@@ -94,7 +96,7 @@ OcConfigLoad (
   EFI_STATUS Status;
 
   Size   = sizeof (mOcConfig);
-  Status = gRT->GetVariable (LOONGSON_OC_VAR_NAME, &mOcVarGuid, NULL, &Size, &mOcConfig);
+  Status = gRT->GetVariable ((CHAR16 *)LOONGSON_OC_VAR_NAME, (EFI_GUID *)&mOcVarGuid, NULL, &Size, &mOcConfig);
   if (EFI_ERROR (Status) || (mOcConfig.CpuFreq > OC_CPU_1200)) {
     mOcConfig.CpuFreq = OC_CPU_DEFAULT;
   }
@@ -236,8 +238,8 @@ OcRouteConfig (
   }
 
   return gRT->SetVariable (
-                LOONGSON_OC_VAR_NAME,
-                &mOcVarGuid,
+                (CHAR16 *)LOONGSON_OC_VAR_NAME,
+                (EFI_GUID *)&mOcVarGuid,
                 EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS |
                 EFI_VARIABLE_RUNTIME_ACCESS,
                 sizeof (mOcConfig),
