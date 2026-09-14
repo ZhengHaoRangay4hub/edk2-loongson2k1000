@@ -294,7 +294,7 @@
   # Stable counter frequency (100MHz constant clock on 2K1000LA).
   gUefiCpuPkgTokenSpaceGuid.PcdCpuCoreCrystalClockFrequency             | 100000000
 
-  gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile                | { 0x66, 0x7d, 0xc4, 0xe9, 0x08, 0xfc, 0xd3, 0x4c, 0xa3, 0x9f, 0x3e, 0xa3, 0x3e, 0xb3, 0x4c, 0x5a }
+  gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile                | { 0xdc, 0x5b, 0xc2, 0xee, 0xf2, 0x67, 0x95, 0x4d, 0xb1, 0xd5, 0xf8, 0x1b, 0x20, 0x39, 0xd1, 0x1d }
 
   # UEFI variable store lives in the SPI NOR behind the 4MB firmware image.
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase64       | 0x1c040000
