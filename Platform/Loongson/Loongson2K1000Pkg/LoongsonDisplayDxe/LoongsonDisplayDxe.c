@@ -25,6 +25,7 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiLib.h>
 
+#include <Guid/EventGroup.h>
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/PciEnumerationComplete.h>
 

@@ -33,6 +33,9 @@
   UefiBootServicesTableLib
   UefiLib
 
+[Guids]
+  gEfiEventExitBootServicesGuid                  ## CONSUMES ## Event
+
 [Protocols]
   gEfiGraphicsOutputProtocolGuid                 ## PRODUCES
   gEfiPciEnumerationCompleteProtocolGuid         ## CONSUMES
