@@ -3,7 +3,7 @@
 
   Publishes an HII formset (Platform Setup class) that lets the user pick
   the CPU core clock; the choice is persisted in the "LoongsonOcCfg"
-  variable and programmed into the CPU PLL (0x1fe00480) at the next boot,
+  variable and programmed into the CPU PLL (0x1fe00480) before boot,
   using the PMON ClkSetting sequence:
     node_clock = 100MHz / L1_REFC(4) * L1_LOOPC / L1_DIV(1) / L2_DIV(2)
 
@@ -21,9 +21,6 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 #include <Library/UefiLib.h>
-#include <Protocol/ComponentName.h>
-#include <Protocol/ComponentName2.h>
-#include <Protocol/DriverBinding.h>
 #include <Protocol/HiiConfigAccess.h>
 #include <Protocol/HiiConfigRouting.h>
 
@@ -40,11 +37,14 @@
 extern UINT8  OverclockFormsBin[];
 extern UINT8  OverclockStringsBin[];
 
-STATIC LOONGSON_OC_CONFIG          mOcConfig;
-STATIC EFI_HII_CONFIG_ACCESS_PROTOCOL mConfigAccess;
-STATIC EFI_HII_HANDLE              mHiiHandle;
-STATIC EFI_HANDLE                  mDriverHandle;
-STATIC EFI_EVENT                   mReadyToBootEvent;
+STATIC LOONGSON_OC_CONFIG               mOcConfig;
+STATIC EFI_HII_CONFIG_ACCESS_PROTOCOL   mConfigAccess;
+STATIC EFI_HII_HANDLE                   mHiiHandle;
+STATIC EFI_HANDLE                       mDriverHandle;
+STATIC EFI_EVENT                        mReadyToBootEvent;
+
+STATIC CONST EFI_GUID  mOcVarGuid     = LOONGSON_OC_VAR_GUID;
+STATIC CONST EFI_GUID  mOcFormsetGuid = LOONGSON_OC_FORMSET_GUID;
 
 /**
   Program the CPU PLL for the requested core clock (MHz).
@@ -58,8 +58,8 @@ ApplyCpuPll (
   IN UINT32  FreqMhz
   )
 {
-  UINTN   Base = LS_MMIO_UNCACHED (CPU_PLL_BASE);
-  UINTN   Loopc = (UINTN)FreqMhz * 8 / 100;          /* Freq / 12.5 */
+  UINTN   Base  = LS_MMIO_UNCACHED (CPU_PLL_BASE);
+  UINTN   Loopc = ((UINTN)FreqMhz * 8) / 100;          /* Freq / 12.5 */
   UINT64  Cfg;
 
   if (FreqMhz < 200) {
@@ -93,33 +93,11 @@ OcConfigLoad (
   UINTN      Size;
   EFI_STATUS Status;
 
-  Size = sizeof (mOcConfig);
-  Status = gRT->GetVariable (
-                  LOONGSON_OC_VAR_NAME,
-                  (EFI_GUID *)LOONGSON_OC_VAR_GUID,
-                  NULL,
-                  &Size,
-                  &mOcConfig
-                  );
+  Size   = sizeof (mOcConfig);
+  Status = gRT->GetVariable (LOONGSON_OC_VAR_NAME, &mOcVarGuid, NULL, &Size, &mOcConfig);
   if (EFI_ERROR (Status) || (mOcConfig.CpuFreq > OC_CPU_1200)) {
     mOcConfig.CpuFreq = OC_CPU_DEFAULT;
   }
-}
-
-STATIC
-EFI_STATUS
-OcConfigSave (
-  VOID
-  )
-{
-  return gRT->SetVariable (
-                LOONGSON_OC_VAR_NAME,
-                (EFI_GUID *)LOONGSON_OC_VAR_GUID,
-                EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS |
-                EFI_VARIABLE_RUNTIME_ACCESS,
-                sizeof (mOcConfig),
-                &mOcConfig
-                );
 }
 
 /**
@@ -152,36 +130,71 @@ OcExtractConfig (
   )
 {
   EFI_STATUS  Status;
-  UINTN       BufferSize;
-  EFI_STRING  ConfigHdr;
+  EFI_STRING  ConfigRequestHdr;
   EFI_STRING  ConfigRequest;
+  UINTN       Size;
+  BOOLEAN     AllocatedRequest;
 
-  if ((Request == NULL) || (Progress == NULL) || (Results == NULL)) {
+  if ((Progress == NULL) || (Results == NULL)) {
     return EFI_INVALID_PARAMETER;
   }
 
-  *Progress = Request;
-  ConfigHdr = NULL;
-  Status = HiiConstructConfigHdr (&ConfigHdr, LOONGSON_OC_VAR_NAME, mDriverHandle);
-  if (EFI_ERROR (Status)) {
-    return Status;
-  }
+  ConfigRequestHdr = NULL;
+  ConfigRequest    = NULL;
+  Size             = 0;
+  AllocatedRequest = FALSE;
 
-  if (StrStr (Request, ConfigHdr) == NULL) {
-    *Progress = Request;
+  *Progress = Request;
+  if ((Request != NULL) && !HiiIsConfigHdrMatch (Request, &mOcVarGuid, LOONGSON_OC_VAR_NAME)) {
     return EFI_NOT_FOUND;
   }
 
-  BufferSize    = sizeof (mOcConfig);
-  ConfigRequest = (EFI_STRING)Request;
-  Status = HiiBlockToConfig (
-             ConfigHdr,
-             (UINT8 *)&mOcConfig,
-             sizeof (mOcConfig),
-             &ConfigRequest,
-             Progress,
-             Results
-             );
+  if ((Request == NULL) || (StrStr (Request, L"OFFSET") == NULL)) {
+    ConfigRequestHdr = HiiConstructConfigHdr (&mOcVarGuid, LOONGSON_OC_VAR_NAME, mDriverHandle);
+    if (ConfigRequestHdr == NULL) {
+      return EFI_OUT_OF_RESOURCES;
+    }
+
+    Size             = (StrLen (ConfigRequestHdr) + 32 + 1) * sizeof (CHAR16);
+    ConfigRequest    = AllocateZeroPool (Size);
+    AllocatedRequest = TRUE;
+    if (ConfigRequest == NULL) {
+      FreePool (ConfigRequestHdr);
+      return EFI_OUT_OF_RESOURCES;
+    }
+
+    UnicodeSPrint (
+      ConfigRequest,
+      Size,
+      L"%s&OFFSET=0&WIDTH=%016LX",
+      ConfigRequestHdr,
+      (UINT64)sizeof (LOONGSON_OC_CONFIG)
+      );
+    FreePool (ConfigRequestHdr);
+  } else {
+    ConfigRequest = (EFI_STRING)Request;
+  }
+
+  Status = gHiiConfigRouting->BlockToConfig (
+                                gHiiConfigRouting,
+                                ConfigRequest,
+                                (VOID *)&mOcConfig,
+                                sizeof (mOcConfig),
+                                Results,
+                                Progress
+                                );
+
+  if (AllocatedRequest) {
+    FreePool (ConfigRequest);
+    if (Request == NULL) {
+      *Progress = NULL;
+    } else if (EFI_ERROR (Status)) {
+      *Progress = Request;
+    } else {
+      *Progress = Request + StrLen (Request);
+    }
+  }
+
   return Status;
 }
 
@@ -195,36 +208,41 @@ OcRouteConfig (
   )
 {
   EFI_STATUS  Status;
-  EFI_STRING  ConfigHdr;
+  UINTN       BufferSize;
 
   if ((Configuration == NULL) || (Progress == NULL)) {
     return EFI_INVALID_PARAMETER;
   }
 
   *Progress = Configuration;
-  ConfigHdr = NULL;
-  Status = HiiConstructConfigHdr (&ConfigHdr, LOONGSON_OC_VAR_NAME, mDriverHandle);
-  if (EFI_ERROR (Status)) {
-    return Status;
-  }
-
-  if (StrStr (Configuration, ConfigHdr) == NULL) {
+  if (!HiiIsConfigHdrMatch (Configuration, &mOcVarGuid, LOONGSON_OC_VAR_NAME)) {
     return EFI_NOT_FOUND;
   }
 
   BufferSize = sizeof (mOcConfig);
-  Status = HiiConfigToBlock (
-             ConfigHdr,
-             Configuration,
-             (UINT8 *)&mOcConfig,
-             &BufferSize,
-             Progress
-             );
+  Status     = gHiiConfigRouting->ConfigToBlock (
+                                    gHiiConfigRouting,
+                                    (EFI_STRING)Configuration,
+                                    (VOID *)&mOcConfig,
+                                    &BufferSize,
+                                    Progress
+                                    );
   if (EFI_ERROR (Status)) {
     return Status;
   }
 
-  return OcConfigSave ();
+  if (mOcConfig.CpuFreq > OC_CPU_1200) {
+    mOcConfig.CpuFreq = OC_CPU_DEFAULT;
+  }
+
+  return gRT->SetVariable (
+                LOONGSON_OC_VAR_NAME,
+                &mOcVarGuid,
+                EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS |
+                EFI_VARIABLE_RUNTIME_ACCESS,
+                sizeof (mOcConfig),
+                &mOcConfig
+                );
 }
 
 STATIC
@@ -232,6 +250,7 @@ EFI_STATUS
 EFIAPI
 OcCallback (
   IN  CONST EFI_HII_CONFIG_ACCESS_PROTOCOL  *This,
+  IN  EFI_BROWSER_ACTION                    Action,
   IN  EFI_QUESTION_ID                       QuestionId,
   IN  UINT8                                 Type,
   IN  EFI_IFR_TYPE_VALUE                    *Value,
@@ -242,8 +261,12 @@ OcCallback (
     return EFI_INVALID_PARAMETER;
   }
 
+  if (Action != EFI_BROWSER_ACTION_CHANGED) {
+    return EFI_UNSUPPORTED;
+  }
+
   //
-  // The browser writes the new selection through RouteConfig on submit;
+  // The browser pushes the new selection through RouteConfig on submit;
   // nothing else to do here.
   //
   *ActionRequest = EFI_BROWSER_ACTION_REQUEST_NONE;
@@ -262,7 +285,6 @@ OnReadyToBoot (
 {
   //
   // Apply the programmed clock at every boot before the OS starts.
-  // (Entry point runs before the PLL is safe to change on cold paths.)
   //
   ApplyCpuPll (OcFreqMhz ());
 }
@@ -275,7 +297,6 @@ LoongsonOverclockDxeEntryPoint (
   )
 {
   EFI_STATUS  Status;
-  UINTN       BufferSize;
 
   OcConfigLoad ();
 
@@ -297,7 +318,7 @@ LoongsonOverclockDxeEntryPoint (
   }
 
   mHiiHandle = HiiAddPackages (
-                 &LOONGSON_OC_FORMSET_GUID,
+                 &mOcFormsetGuid,
                  mDriverHandle,
                  OverclockStringsBin,
                  OverclockFormsBin,
@@ -307,6 +328,7 @@ LoongsonOverclockDxeEntryPoint (
     gBS->UninstallMultipleProtocolInterfaces (
            mDriverHandle,
            &gEfiDevicePathProtocolGuid,
+           NULL,
            &gEfiHiiConfigAccessProtocolGuid,
            &mConfigAccess,
            NULL
