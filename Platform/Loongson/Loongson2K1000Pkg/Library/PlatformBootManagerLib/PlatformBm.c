@@ -1227,7 +1227,7 @@ PlatformBootManagerAfterConsole (
   // Rich graphical dashboard (LVGL) when LvglPkg is built in.
   //
   PlatformRegisterFvBootOption (
-    &mUefiDashboardFileGuid,
+    (EFI_GUID *)&mUefiDashboardFileGuid,
     L"UEFI Dashboard (LVGL)",
     LOAD_OPTION_ACTIVE | LOAD_OPTION_CATEGORY_APP,
     TRUE
