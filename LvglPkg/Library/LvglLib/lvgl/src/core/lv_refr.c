@@ -695,7 +695,7 @@ static void refr_sync_areas(void)
 
     /*Iterate through invalidated areas to see if sync area should be copied*/
     uint16_t i;
-    int8_t j;
+    int32_t j;
     lv_area_t res[4] = {0};
     int8_t res_c;
     lv_area_t * sync_area, * new_area, * next_area;
