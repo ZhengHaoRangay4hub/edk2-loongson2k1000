@@ -1,0 +1,52 @@
+
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = LvglPkg
+  PACKAGE_GUID                   = 5719B5C8-5F9A-4205-BD09-2E416EF4BDCC
+  PACKAGE_VERSION                = 0.98
+
+[Includes]
+  Include
+  Library/LvglLib/lvgl
+
+[Includes.Common.Private]
+
+
+[LibraryClasses]
+  LvglLib|Include/Library/LvglLib.h
+  LvglThemeLib|Include/Library/LvglThemeLib.h
+
+[Guids]
+  ## LVGL UI configuration formset / variable GUID
+  gLvglUiConfigFormSetGuid = { 0xddb969f2, 0xe99b, 0x4dd5, { 0x8e, 0x36, 0xb8, 0x0b, 0x52, 0x6d, 0x3b, 0x73 } }
+
+  ## Token space for LvglPkg platform overrides (chrome strings, layout).
+  gLvglPkgTokenSpaceGuid = { 0xd27adb1f, 0x1e75, 0x4e16, { 0xbf, 0x45, 0xf0, 0xf4, 0x0f, 0xfa, 0xef, 0xe8 } }
+
+[PcdsFixedAtBuild, PcdsPatchableInModule]
+  ## Help pane width as a percentage of the content row (Middle band).
+  #  ~19 matches the default 240 px fixed width on a 1280 px panel.
+  gLvglPkgTokenSpaceGuid.PcdLvglHelpPaneWidthPct|19|UINT8|0x00000001
+
+  ## Header bar title (left).
+  gLvglPkgTokenSpaceGuid.PcdLvglAptioHeaderTitle|"EDK II Boot Manager"|VOID*|0x00000002
+
+  ## Header bar vendor/version string (center). Empty string is allowed.
+  gLvglPkgTokenSpaceGuid.PcdLvglAptioHeaderVendor|"UEFI v2.90  |  EDK II"|VOID*|0x00000003
+
+  ## When TRUE, cap the UI to a centered window with a fixed aspect ratio
+  ## instead of filling the display edge-to-edge (useful on ultrawide panels).
+  gLvglPkgTokenSpaceGuid.PcdLvglCenteredFrameEnabled|FALSE|BOOLEAN|0x00000004
+
+  ## Centered frame height as a percentage of the display height (1-100).
+  gLvglPkgTokenSpaceGuid.PcdLvglCenteredFrameHeightPct|90|UINT8|0x00000005
+
+  ## Centered frame width/height aspect ratio (width = height * Num / Den).
+  gLvglPkgTokenSpaceGuid.PcdLvglCenteredFrameAspectNum|16|UINT8|0x00000006
+  gLvglPkgTokenSpaceGuid.PcdLvglCenteredFrameAspectDen|9|UINT8|0x00000007
+
+  ## When TRUE, promote the centered front-page banner (device model) into the
+  ## Aptio subtitle bar and omit it from the scrollable content area. When FALSE,
+  ## show the form title in the subtitle bar and render the centered banner in
+  ## the content area (original behavior).
+  gLvglPkgTokenSpaceGuid.PcdLvglAptioSubtitleShowsDeviceModel|FALSE|BOOLEAN|0x00000008

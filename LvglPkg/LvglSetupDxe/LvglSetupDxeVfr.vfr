@@ -1,0 +1,90 @@
+// *++
+//
+// LVGL UI configuration formset.
+//
+// Presents graphical UI settings stored in the non-volatile LvglUiScale
+// variable. Platform PCDs supply the defaults on first boot. A reboot is
+// required for changes to take effect.
+//
+// Copyright (c) 2026, MrChromebox. All rights reserved.<BR>
+// SPDX-License-Identifier: BSD-2-Clause-Patent
+//
+// --*/
+
+#include <Uefi/UefiMultiPhase.h>
+#include <Guid/HiiPlatformSetupFormset.h>
+#include <Guid/LvglUiConfig.h>
+
+formset
+  guid      = LVGL_UI_CONFIG_FORMSET_GUID,
+  title     = STRING_TOKEN(STR_FORM_SET_TITLE),
+  help      = STRING_TOKEN(STR_FORM_SET_TITLE_HELP),
+  classguid = EFI_HII_PLATFORM_SETUP_FORMSET_GUID,
+
+  efivarstore LVGL_UI_CONFIG_VARSTORE_DATA,
+    attribute = EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS,
+    name      = LvglUiScale,
+    guid      = LVGL_UI_CONFIG_FORMSET_GUID;
+
+  form formid = 1,
+    title = STRING_TOKEN(STR_FORM_SET_TITLE);
+
+    subtitle text = STRING_TOKEN(STR_UI_SCALE_SECTION);
+
+    oneof varid = LvglUiScale.UiScale,
+      prompt = STRING_TOKEN(STR_UI_SCALE_PROMPT),
+      help   = STRING_TOKEN(STR_UI_SCALE_HELP),
+      flags  = NUMERIC_SIZE_1 | RESET_REQUIRED,
+      option text = STRING_TOKEN(STR_UI_SCALE_1X),   value = 0, flags = DEFAULT | MANUFACTURING;
+      option text = STRING_TOKEN(STR_UI_SCALE_1_5X), value = 1, flags = 0;
+      option text = STRING_TOKEN(STR_UI_SCALE_2X),   value = 2, flags = 0;
+    endoneof;
+
+    subtitle text = STRING_TOKEN(STR_CENTERED_FRAME_SECTION);
+
+    checkbox varid = LvglUiScale.CenteredFrameEnabled,
+      prompt = STRING_TOKEN(STR_CENTERED_FRAME_PROMPT),
+      help   = STRING_TOKEN(STR_CENTERED_FRAME_HELP),
+      flags  = RESET_REQUIRED,
+    endcheckbox;
+
+    grayoutif ideqval LvglUiScale.CenteredFrameEnabled == 0;
+
+    numeric varid = LvglUiScale.CenteredFrameHeightPct,
+      prompt = STRING_TOKEN(STR_CENTERED_FRAME_HEIGHT_PROMPT),
+      help   = STRING_TOKEN(STR_CENTERED_FRAME_HEIGHT_HELP),
+      flags  = NUMERIC_SIZE_1 | RESET_REQUIRED,
+      minimum = 1,
+      maximum = 100,
+      step    = 0,
+    endnumeric;
+
+    numeric varid = LvglUiScale.CenteredFrameAspectNum,
+      prompt = STRING_TOKEN(STR_CENTERED_FRAME_ASPECT_NUM_PROMPT),
+      help   = STRING_TOKEN(STR_CENTERED_FRAME_ASPECT_NUM_HELP),
+      flags  = NUMERIC_SIZE_1 | RESET_REQUIRED,
+      minimum = 1,
+      maximum = 255,
+      step    = 0,
+    endnumeric;
+
+    numeric varid = LvglUiScale.CenteredFrameAspectDen,
+      prompt = STRING_TOKEN(STR_CENTERED_FRAME_ASPECT_DEN_PROMPT),
+      help   = STRING_TOKEN(STR_CENTERED_FRAME_ASPECT_DEN_HELP),
+      flags  = NUMERIC_SIZE_1 | RESET_REQUIRED,
+      minimum = 1,
+      maximum = 255,
+      step    = 0,
+    endnumeric;
+
+    endif;
+
+    checkbox varid = LvglUiScale.SubtitleShowsDeviceModel,
+      prompt = STRING_TOKEN(STR_SUBTITLE_DEVICE_MODEL_PROMPT),
+      help   = STRING_TOKEN(STR_SUBTITLE_DEVICE_MODEL_HELP),
+      flags  = RESET_REQUIRED,
+    endcheckbox;
+
+  endform;
+
+endformset;

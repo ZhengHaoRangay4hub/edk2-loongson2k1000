@@ -1,0 +1,46 @@
+## @file
+#  LVGL UI configuration setup driver.
+#
+#  Publishes an HII form exposing the software UI-scale control (1x / 1.5x / 2x)
+#  and seeds the backing non-volatile variable on first boot. The LVGL library
+#  consumes the value when it creates the display.
+#
+#  Copyright (c) 2026, MrChromebox. All rights reserved.<BR>
+#
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION     = 0x0001001B
+  BASE_NAME       = LvglSetupDxe
+  FILE_GUID       = 3b6c1e74-6a2d-4a1f-9d3e-2c7b8a5f0e91
+  MODULE_TYPE     = DXE_DRIVER
+  VERSION_STRING  = 1.0
+  ENTRY_POINT     = LvglSetupInitialize
+
+[Sources]
+  LvglSetupDxe.c
+  LvglSetupDxe.uni
+  LvglSetupDxeVfr.vfr
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  LvglPkg/LvglPkg.dec
+
+[LibraryClasses]
+  DebugLib
+  DevicePathLib
+  HiiLib
+  LvglUiConfigLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+
+[Guids]
+  gLvglUiConfigFormSetGuid
+
+[Depex]
+  gEfiVariableArchProtocolGuid        AND
+  gEfiVariableWriteArchProtocolGuid   AND
+  gEfiHiiDatabaseProtocolGuid

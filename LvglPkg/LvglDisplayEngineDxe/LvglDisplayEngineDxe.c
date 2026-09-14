@@ -1,0 +1,213 @@
+/** @file
+  LVGL-based Display Engine DXE driver.
+
+  Produces EDKII_FORM_DISPLAY_ENGINE_PROTOCOL so that SetupBrowserDxe can
+  call FormDisplay(), ExitDisplay(), and ConfirmDataChange().  FormDisplay()
+  delegates to LvglFormRenderer which builds LVGL widgets from the
+  FORM_DISPLAY_ENGINE_FORM structure and runs the LVGL event loop.
+
+  Copyright (c) 2024-2026, Hamit Karaca. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
+
+**/
+
+#include <Uefi.h>
+#include <Library/UefiBootServicesTableLib.h>
+#include <Library/DebugLib.h>
+#include <Library/BaseMemoryLib.h>
+#include <Library/MemoryAllocationLib.h>
+#include <Protocol/DisplayProtocol.h>
+#include <Protocol/FormBrowserEx.h>
+#include "LvglFormRenderer.h"
+
+//
+// Private data
+//
+#define LVGL_DISPLAY_ENGINE_SIGNATURE  SIGNATURE_32 ('L', 'D', 'E', 'N')
+
+typedef struct {
+  UINT32                                Signature;
+  EFI_HANDLE                            Handle;
+  EDKII_FORM_DISPLAY_ENGINE_PROTOCOL    Protocol;
+} LVGL_DISPLAY_ENGINE_PRIVATE_DATA;
+
+STATIC LVGL_DISPLAY_ENGINE_PRIVATE_DATA  mPrivateData;
+
+/**
+  EFI_HII_POPUP_PROTOCOL.CreatePopup thunk -- delegates to the LVGL renderer's
+  modal popup. In stock EDK2 this protocol is produced by DisplayEngineDxe;
+  driver callbacks (e.g. SecureBootConfigDxe's "Reset Secure Boot Keys" Yes/No
+  confirmation) locate it, so the LVGL engine must produce it too.
+**/
+STATIC
+EFI_STATUS
+EFIAPI
+LvglHiiPopupCreate (
+  IN  EFI_HII_POPUP_PROTOCOL   *This,
+  IN  EFI_HII_POPUP_STYLE      PopupStyle,
+  IN  EFI_HII_POPUP_TYPE       PopupType,
+  IN  EFI_HII_HANDLE           HiiHandle,
+  IN  EFI_STRING_ID            Message,
+  OUT EFI_HII_POPUP_SELECTION  *UserSelection OPTIONAL
+  )
+{
+  return LvglHiiCreatePopup (PopupStyle, PopupType, HiiHandle, Message, UserSelection);
+}
+
+STATIC EFI_HII_POPUP_PROTOCOL  mHiiPopup = {
+  EFI_HII_POPUP_PROTOCOL_REVISION,
+  LvglHiiPopupCreate
+};
+
+/**
+  Display one form and return user input.
+
+  @param[in]  FormData        Form data to be displayed.
+  @param[out] UserInputData   User input result.
+
+  @retval EFI_SUCCESS         Form displayed and user input captured.
+**/
+STATIC
+EFI_STATUS
+EFIAPI
+LvglFormDisplay (
+  IN  FORM_DISPLAY_ENGINE_FORM  *FormData,
+  OUT USER_INPUT                *UserInputData
+  )
+{
+  DEBUG ((DEBUG_INFO, "LvglDisplayEngine: FormDisplay() called -- FormId=0x%x\n", FormData->FormId));
+
+  return LvglRenderForm (FormData, UserInputData);
+}
+
+/**
+  Exit display and clean up.
+**/
+STATIC
+VOID
+EFIAPI
+LvglExitDisplay (
+  VOID
+  )
+{
+  DEBUG ((DEBUG_INFO, "LvglDisplayEngine: ExitDisplay() called\n"));
+
+  LvglRendererCleanup ();
+}
+
+/**
+  Confirm how to handle changed data (submit / discard / none).
+
+  @return Action -- BROWSER_ACTION_SUBMIT, BROWSER_ACTION_DISCARD, or BROWSER_ACTION_NONE.
+**/
+STATIC
+UINTN
+EFIAPI
+LvglConfirmDataChange (
+  VOID
+  )
+{
+  DEBUG ((DEBUG_INFO, "LvglDisplayEngine: ConfirmDataChange() called\n"));
+
+  return (UINTN)LvglRunConfirmPopup ();
+}
+
+/**
+  Entry point -- install EDKII_FORM_DISPLAY_ENGINE_PROTOCOL.
+
+  @param[in] ImageHandle   Driver image handle.
+  @param[in] SystemTable   Pointer to EFI System Table.
+
+  @retval EFI_SUCCESS      Protocol installed successfully.
+**/
+EFI_STATUS
+EFIAPI
+LvglDisplayEngineInit (
+  IN EFI_HANDLE        ImageHandle,
+  IN EFI_SYSTEM_TABLE  *SystemTable
+  )
+{
+  EFI_STATUS  Status;
+
+  DEBUG ((DEBUG_INFO, "LvglDisplayEngine: initializing\n"));
+
+  mPrivateData.Signature             = LVGL_DISPLAY_ENGINE_SIGNATURE;
+  mPrivateData.Handle                = NULL;
+  mPrivateData.Protocol.FormDisplay      = LvglFormDisplay;
+  mPrivateData.Protocol.ExitDisplay      = LvglExitDisplay;
+  mPrivateData.Protocol.ConfirmDataChange = LvglConfirmDataChange;
+
+  Status = gBS->InstallProtocolInterface (
+                  &mPrivateData.Handle,
+                  &gEdkiiFormDisplayEngineProtocolGuid,
+                  EFI_NATIVE_INTERFACE,
+                  &mPrivateData.Protocol
+                  );
+  ASSERT_EFI_ERROR (Status);
+
+  //
+  // Also produce EFI_HII_POPUP_PROTOCOL (normally produced by DisplayEngineDxe,
+  // which we replace) so driver callbacks can raise Yes/No confirmations.
+  //
+  Status = gBS->InstallProtocolInterface (
+                  &mPrivateData.Handle,
+                  &gEfiHiiPopupProtocolGuid,
+                  EFI_NATIVE_INTERFACE,
+                  &mHiiPopup
+                  );
+  ASSERT_EFI_ERROR (Status);
+
+  //
+  // Register F10 (Save) and F9 (Load Defaults) hotkeys, mirroring the
+  // original DisplayEngineDxe that we replace. Without this, HotKeyListHead
+  // is empty and F9/F10 have no effect.
+  //
+  {
+    EDKII_FORM_BROWSER_EXTENSION_PROTOCOL  *FormBrowserEx;
+    EFI_INPUT_KEY                          HotKey;
+
+    Status = gBS->LocateProtocol (
+                    &gEdkiiFormBrowserExProtocolGuid,
+                    NULL,
+                    (VOID **)&FormBrowserEx
+                    );
+    if (!EFI_ERROR (Status)) {
+      HotKey.UnicodeChar = CHAR_NULL;
+      HotKey.ScanCode    = SCAN_F10;
+      FormBrowserEx->RegisterHotKey (&HotKey, BROWSER_ACTION_SUBMIT, 0, L"F10=Save");
+
+      HotKey.ScanCode = SCAN_F9;
+      FormBrowserEx->RegisterHotKey (&HotKey, BROWSER_ACTION_DEFAULT, 0, L"F9=Load Defaults");
+    }
+  }
+
+  DEBUG ((DEBUG_INFO, "LvglDisplayEngine: protocol installed\n"));
+
+  return EFI_SUCCESS;
+}
+
+/**
+  Unload handler -- uninstall the protocol.
+
+  @param[in] ImageHandle   Driver image handle.
+
+  @retval EFI_SUCCESS      Protocol uninstalled.
+**/
+EFI_STATUS
+EFIAPI
+LvglDisplayEngineUnload (
+  IN EFI_HANDLE  ImageHandle
+  )
+{
+  EFI_STATUS  Status;
+
+  Status = gBS->UninstallProtocolInterface (
+                  mPrivateData.Handle,
+                  &gEdkiiFormDisplayEngineProtocolGuid,
+                  &mPrivateData.Protocol
+                  );
+
+  DEBUG ((DEBUG_INFO, "LvglDisplayEngine: unloaded -- %r\n", Status));
+
+  return Status;
+}

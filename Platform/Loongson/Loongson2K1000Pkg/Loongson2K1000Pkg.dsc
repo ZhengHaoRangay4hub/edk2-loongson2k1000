@@ -117,6 +117,9 @@
   UefiUsbLib                       | MdePkg/Library/UefiUsbLib/UefiUsbLib.inf
   SerializeVariablesLib            | OvmfPkg/Library/SerializeVariablesLib/SerializeVariablesLib.inf
   CustomizedDisplayLib             | Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf
+  LvglLib                          | LvglPkg/Library/LvglLib/LvglLib.inf
+  LvglThemeLib                     | LvglPkg/Library/LvglThemeLib/LvglThemeLib.inf
+  LvglUiConfigLib                  | LvglPkg/Library/LvglUiConfigLib/LvglUiConfigLib.inf
   DebugPrintErrorLevelLib          | MdePkg/Library/BaseDebugPrintErrorLevelLib/BaseDebugPrintErrorLevelLib.inf
   VarCheckLib                      | MdeModulePkg/Library/VarCheckLib/VarCheckLib.inf
   TpmMeasurementLib                | MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
@@ -461,7 +464,7 @@
       PcdLib                           | MdePkg/Library/BasePcdLibNull/BasePcdLibNull.inf
   }
   MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
-  MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
+  LvglPkg/LvglDisplayEngineDxe/LvglDisplayEngineDxe.inf
   MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
   MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
   MdeModulePkg/Logo/LogoDxe.inf

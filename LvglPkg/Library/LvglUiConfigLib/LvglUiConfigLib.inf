@@ -1,0 +1,39 @@
+## @file
+#  LVGL UI configuration library.
+#
+#  Copyright (c) 2026, MrChromebox. All rights reserved.<BR>
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION     = 0x0001001B
+  BASE_NAME       = LvglUiConfigLib
+  FILE_GUID       = 4c8e2f1a-9b3d-4e6c-a1f0-7d2b5c8e9f01
+  MODULE_TYPE     = DXE_DRIVER
+  VERSION_STRING  = 1.0
+  LIBRARY_CLASS   = LvglUiConfigLib|DXE_DRIVER UEFI_APPLICATION
+
+[Sources]
+  LvglUiConfigLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  LvglPkg/LvglPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  PcdLib
+  UefiRuntimeServicesTableLib
+
+[Guids]
+  gLvglUiConfigFormSetGuid
+
+[Pcd]
+  gLvglPkgTokenSpaceGuid.PcdLvglCenteredFrameEnabled
+  gLvglPkgTokenSpaceGuid.PcdLvglCenteredFrameHeightPct
+  gLvglPkgTokenSpaceGuid.PcdLvglCenteredFrameAspectNum
+  gLvglPkgTokenSpaceGuid.PcdLvglCenteredFrameAspectDen
+  gLvglPkgTokenSpaceGuid.PcdLvglAptioSubtitleShowsDeviceModel
