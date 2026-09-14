@@ -294,6 +294,10 @@
   # Stable counter frequency (100MHz constant clock on 2K1000LA).
   gUefiCpuPkgTokenSpaceGuid.PcdCpuCoreCrystalClockFrequency             | 100000000
 
+  # Default the BIOS UI to Simplified Chinese (user-switchable in the FrontPage).
+  gEfiMdePkgTokenSpaceGuid.PcdUefiVariableDefaultPlatformLang        | "zh-Hans"
+  gEfiMdePkgTokenSpaceGuid.PcdUefiVariableDefaultPlatformLangCodes   | "en-US;fr-FR;zh-Hans"
+
   gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile                | { 0xdc, 0x5b, 0xc2, 0xee, 0xf2, 0x67, 0x95, 0x4d, 0xb1, 0xd5, 0xf8, 0x1b, 0x20, 0x39, 0xd1, 0x1d }
 
   # UEFI variable store lives in the SPI NOR behind the 4MB firmware image.
