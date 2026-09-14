@@ -1019,18 +1019,6 @@ UninstallEfiMemoryAttributesProtocol (
 }
 
 /**
-  Do the platform specific action after the console is ready
-  Possible things that can be done in PlatformBootManagerAfterConsole:
-  > Console post action:
-    > Dynamically switch output mode from 100x31 to 80x25 for certain scenario
-    > Signal console ready platform customized event
-  > Run diagnostics like memory testing
-  > Connect certain devices
-  > Dispatch additional option roms
-  > Special boot: e.g.: USB boot, enter UI
-**/
-VOID
-/**
   When a graphics console is available, make it the only ConOut device.
 
   ConSplitterDxe intersects the text modes of all ConOut devices, and the
@@ -1156,12 +1144,17 @@ PlatformSelectLargestConsoleMode (
 }
 
 /**
-  Do platform specific initialization action.
-
-  @retval EFI_SUCCESS                Platform specific initialization succeeded.
-  @retval EFI_OUT_OF_RESOURCES       No enough memory to cache the boot logo.
+  Do the platform specific action after the console is ready
+  Possible things that can be done in PlatformBootManagerAfterConsole:
+  > Console post action:
+    > Dynamically switch output mode to the largest mode for the current
+      resolution, so the BIOS UI fills the screen
+  > Run diagnostics like memory testing
+  > Connect certain devices
+  > Dispatch additional option roms
+  > Special boot: e.g.: USB boot, enter UI
 **/
-EFI_STATUS
+VOID
 EFIAPI
 PlatformBootManagerAfterConsole (
   VOID
