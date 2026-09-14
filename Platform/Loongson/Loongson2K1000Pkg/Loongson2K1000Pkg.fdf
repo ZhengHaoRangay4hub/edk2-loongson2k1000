@@ -118,7 +118,7 @@ INF  Platform/Loongson/Loongson2K1000Pkg/LoongsonOverclockDxe/LoongsonOverclockD
 INF  LvglPkg/Application/UefiDashboard/UefiDashboard.inf
 INF  LvglPkg/Application/LvglDemoApp/LvglDemoApp.inf
 INF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
-INF  MdeModulePkg/Application/UiApp/UiApp.inf
+INF  LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf
 
 #
 # Console

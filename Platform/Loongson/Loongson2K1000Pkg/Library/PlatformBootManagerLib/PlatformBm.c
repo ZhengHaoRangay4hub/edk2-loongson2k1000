@@ -44,6 +44,15 @@ STATIC CONST EFI_GUID mFdtTableGuid = {
 };
 
 //
+// LvglSetupApp.efi (LvglPkg): the graphical setup center, registered as the
+// "EFI Firmware Setup" boot option.
+//
+STATIC CONST EFI_GUID mLvglSetupAppFileGuid = {
+  0x9c4e2a17, 0x5b3d, 0x4e86,
+  { 0xa2, 0xf1, 0x7d, 0x05, 0xc3, 0xb8, 0x9e, 0x42 }
+};
+
+//
 // UefiDashboard.efi (LvglPkg): registered as a boot option when it is
 // present in a firmware volume.
 //
@@ -954,7 +963,7 @@ PlatformBootManagerBeforeConsole (
   FirmwareSetupEnabled = TRUE;
 
   PlatformRegisterFvBootOption (
-    &gUiAppFileGuid,
+    (EFI_GUID *)&mLvglSetupAppFileGuid,
     L"EFI Firmware Setup",
     LOAD_OPTION_ACTIVE | LOAD_OPTION_CATEGORY_APP,
     FirmwareSetupEnabled

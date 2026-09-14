@@ -1,0 +1,51 @@
+## @file
+#  Loongson 2K1000LA firmware setup center (LVGL based).
+#
+#  Copyright (c) 2026, Loongson2K1000LA EDK2 port contributors.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = LvglSetupApp
+  FILE_GUID                      = 9C4E2A17-5B3D-4E86-A2F1-7D05C3B89E42
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+[Sources]
+  LvglSetupApp.c
+  Fonts/lv_font_ls_setup_16.c
+  Fonts/lv_font_ls_setup_24.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  LvglPkg/LvglPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  MemoryAllocationLib
+  PrintLib
+  UefiApplicationEntryPoint
+  UefiBootManagerLib
+  UefiBootServicesTableLib
+  UefiLib
+  UefiRuntimeServicesTableLib
+  LvglLib
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid                 ## CONSUMES
+
+[Guids]
+  gEfiGlobalVariableGuid                         ## CONSUMES
+
+[BuildOptions]
+  #
+  # LVGL/third-party headers need the freestanding shims; demote the
+  # warning classes EDK2 turns into errors for this code.
+  #
+  GCC:*_*_*_CC_FLAGS = -Wno-error=char-subscripts -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=discarded-qualifiers -I$(WORKSPACE)/LvglPkg/Library/LvglLib

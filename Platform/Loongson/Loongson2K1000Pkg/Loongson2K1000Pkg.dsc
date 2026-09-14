@@ -481,12 +481,10 @@
 
   MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
 
-  MdeModulePkg/Application/UiApp/UiApp.inf {
-    <LibraryClasses>
-      NULL|MdeModulePkg/Library/DeviceManagerUiLib/DeviceManagerUiLib.inf
-      NULL|MdeModulePkg/Library/BootManagerUiLib/BootManagerUiLib.inf
-      NULL|MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManagerUiLib.inf
-  }
+  #
+  # Graphical (LVGL) setup center replaces the text UiApp setup front page.
+  #
+  LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf
 
   #
   # Console
