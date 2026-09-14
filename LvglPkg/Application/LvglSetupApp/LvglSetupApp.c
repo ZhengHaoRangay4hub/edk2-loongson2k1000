@@ -72,9 +72,16 @@ STATIC lv_obj_t  *mNavBtn[NAV_COUNT];
 STATIC lv_obj_t  *mNavLabel[NAV_COUNT];
 STATIC lv_obj_t  *mPage[NAV_COUNT];
 STATIC lv_obj_t  *mStatusLabel;
+STATIC lv_group_t *mGroup;
+
+/* Interactive widgets per page, in navigation order (sidebar first). */
+#define MAX_PAGE_ITEMS  16
+STATIC lv_obj_t  *mPageItems[NAV_COUNT][MAX_PAGE_ITEMS];
+STATIC UINTN     mPageItemCount[NAV_COUNT];
 STATIC lv_obj_t  *mOcOptBtn[OC_COUNT];
 STATIC lv_obj_t  *mOcOptLabel[OC_COUNT];
 STATIC lv_obj_t  *mOcNotice;
+STATIC lv_obj_t  *mBootNotice;
 STATIC lv_obj_t  *mOcValueLabel;
 STATIC UINTN     mActivePage;
 
@@ -340,7 +347,7 @@ UpdateStatusBar (
   AsciiSPrint (
     Text,
     sizeof (Text),
-    "LA264 x2  ·  %u MHz  ·  %s",
+    "%u MHz  ·  %s",
     mOcFreq[mOcSel],
     Res
     );
@@ -352,6 +359,18 @@ UpdateStatusBar (
 /* ------------------------------------------------------------------ */
 /* Page switching                                                      */
 /* ------------------------------------------------------------------ */
+
+STATIC
+VOID
+AddPageItem (
+  IN UINTN     Page,
+  IN lv_obj_t  *Obj
+  )
+{
+  if (mPageItemCount[Page] < MAX_PAGE_ITEMS) {
+    mPageItems[Page][mPageItemCount[Page]++] = Obj;
+  }
+}
 
 STATIC
 VOID
@@ -396,6 +415,24 @@ ShowPage (
   }
 
   RestyleNav (Index);
+
+  //
+  // Keyboard navigation: sidebar first, then the widgets of the active
+  // page (LVGL only navigates objects that are in the indev's group).
+  //
+  if (mGroup != NULL) {
+    lv_group_remove_all_objs (mGroup);
+
+    for (Loop = 0; Loop < NAV_COUNT; Loop++) {
+      lv_group_add_obj (mGroup, mNavBtn[Loop]);
+    }
+
+    for (Loop = 0; Loop < mPageItemCount[Index]; Loop++) {
+      lv_group_add_obj (mGroup, mPageItems[Index][Loop]);
+    }
+
+    lv_group_focus_obj (mNavBtn[Index]);
+  }
 }
 
 STATIC
@@ -503,6 +540,7 @@ BuildPageOverclock (
     mOcOptLabel[Index] = MakeLabel (Btn, "", &lv_font_ls_setup_16, CLR_TEXT);
     lv_obj_center (mOcOptLabel[Index]);
     lv_obj_add_event_cb (Btn, OcClickHandler, LV_EVENT_CLICKED, NULL);
+    AddPageItem (1, Btn);
   }
 
   RestyleOcOptions ();
@@ -565,7 +603,9 @@ BootOptionClickHandler (
     AsciiSPrint (Text, sizeof (Text), "已设为下次启动：%a", Option->Description);
   }
 
-  lv_label_set_text (mOcNotice != NULL ? mOcNotice : mStatusLabel, Text);
+  if (mBootNotice != NULL) {
+    lv_label_set_text (mBootNotice, Text);
+  }
 }
 
 STATIC
@@ -581,7 +621,9 @@ BuildPageBoot (
   CHAR8                         Text[192];
 
   Card = MakeCard (Page, "启动选项");
-  MakeLabel (Card, "单击启动项可将其设为“下次启动”。", &lv_font_ls_setup_16, CLR_MUTED);
+  MakeLabel (Card, "选择一个启动项，将其设为“下次启动”。", &lv_font_ls_setup_16, CLR_MUTED);
+
+  mBootNotice = MakeLabel (Card, "尚未修改启动顺序。", &lv_font_ls_setup_16, CLR_MUTED);
 
   Options = EfiBootManagerGetLoadOptions (&Count, LoadOptionTypeBoot);
   if ((Options == NULL) || (Count == 0)) {
@@ -609,6 +651,7 @@ BuildPageBoot (
     lv_obj_align (Label, LV_ALIGN_LEFT_MID, 14, 0);
 
     lv_obj_add_event_cb (Btn, BootOptionClickHandler, LV_EVENT_CLICKED, &Options[Index]);
+    AddPageItem (2, Btn);
   }
 }
 
@@ -760,6 +803,7 @@ LvglSetupMain (
   /* ---------------------------------------------------------------- */
   Group = lv_group_create ();
   lv_group_set_default (Group);
+  mGroup = Group;
   Indev = NULL;
   for ( ; ; ) {
     Indev = lv_indev_get_next (Indev);
@@ -893,8 +937,7 @@ LvglSetupMain (
 
   Hint = MakeLabel (
            Footer,
-           LV_SYMBOL_UP " " LV_SYMBOL_DOWN " 移动    " LV_SYMBOL_OK " 回车确认    "
-           LV_SYMBOL_CLOSE " Esc 退出",
+           "方向键 移动      回车 确认      Esc 退出",
            &lv_font_ls_setup_16,
            CLR_MUTED
            );
