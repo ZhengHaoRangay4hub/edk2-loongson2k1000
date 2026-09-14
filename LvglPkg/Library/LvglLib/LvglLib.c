@@ -15,7 +15,7 @@ static void efi_lv_log_print(lv_log_level_t level, const char * buf)
         DEBUG_VERBOSE|DEBUG_INFO|DEBUG_WARN|DEBUG_ERROR, DEBUG_INFO, DEBUG_WARN, DEBUG_ERROR, DEBUG_INFO
     };
 
-    DebugPrint (priority[level], "[LVGL] %a\n", buf);
+    DebugPrint (priority[(int)level], "[LVGL] %a\n", buf);
 }
 #endif
 
