@@ -78,6 +78,25 @@ build -b RELEASE -t GCC -a LOONGARCH64 -p Platform/Loongson/Loongson2K1000Pkg/Lo
   SEC → PEI → DXE → BDS 全链跑通，BDS 正常报告无可引导设备并进入
   Boot Manager；UiApp 设置界面（FrontPage / Device Manager / Boot
   Manager / Boot Maintenance Manager / 语言选择）经串口终端完整渲染。
+- **开机 Logo**：自制发光"龙"启动画面（`assets/logo.bmp`，1024×512，
+  Setup 控制台 1024×768），CI 构建时替换上游默认 Logo，
+  见 [docs/img/boot-splash.png](docs/img/boot-splash.png)。
+- **OpenWrt 24.10.1 实机引导验证**（loongarch64/generic 官方镜像，
+  无需任何修改）：
+
+  ```sh
+  qemu-system-loongarch64 -m 1G -M virt -smp 2 -cpu la464 \
+    -drive if=pflash,format=raw,file=QEMU_EFI.fd,readonly=on \
+    -drive if=pflash,format=raw,file=vars.fd \
+    -drive file=openwrt-24.10.1-loongarch64-generic-generic-ext4-combined-efi.img,if=none,id=nvme1,format=raw \
+    -device nvme,drive=nvme1,serial=1634 \
+    -device ramfb -device qemu-xhci -device usb-kbd -serial stdio
+  ```
+
+  链路：固件 BDS 发现 NVMe → `EFI/BOOT/BOOTLOONGARCH64.EFI`(GRUB)
+  → EFI stub 内核 → mount_root → procd → `root@OpenWrt:~#`。
+  官方 generic 内核未内置 virtio-blk，但内置 nvme，因此磁盘必须走
+  `-device nvme`；实机效果见 [docs/img/openwrt-console.png](docs/img/openwrt-console.png)。
 - **真机**：DDR3 初始化/leveling 序列按 PMON 原样移植且编译通过，
   但**尚未在实体教育派上点灯验证**——首次上电请按 FLASHING.md 备份并
   保留串口日志。
