@@ -30,6 +30,7 @@
 
 # Wrapper header files start #
   limits.h
+  inttypes.h
   stdint.h
   stdio.h
   stdarg.h
