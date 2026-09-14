@@ -9,7 +9,7 @@
 
 [Defines]
   INF_VERSION                    = 0x00010005
-  BASE_NAME                      = LoongsonSetupThemeLib
+  BASE_NAME                      = CustomizedDisplayLib
   MODULE_UNI_FILE                = CustomizedDisplayLibModStrs.uni
   FILE_GUID                      = 29C13030-E72B-43BE-803A-58E7321F11C7
   MODULE_TYPE                    = DXE_DRIVER
