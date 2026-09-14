@@ -28,7 +28,7 @@ formset
     oneof varid  = LoongsonOcCfg.CpuFreq,
       prompt      = STRING_TOKEN(STR_OC_CPU_FREQ),
       help        = STRING_TOKEN(STR_OC_CPU_FREQ_HELP),
-      option text = STRING_TOKEN(STR_OC_CPU_800),  value = 0x00, default = 1;
+      option text = STRING_TOKEN(STR_OC_CPU_800),  value = 0x00, flags = DEFAULT;
       option text = STRING_TOKEN(STR_OC_CPU_900),  value = 0x01;
       option text = STRING_TOKEN(STR_OC_CPU_1000), value = 0x02;
       option text = STRING_TOKEN(STR_OC_CPU_1100), value = 0x03;
