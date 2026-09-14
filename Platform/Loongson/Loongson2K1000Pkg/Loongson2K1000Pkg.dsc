@@ -317,12 +317,12 @@
 [PcdsDynamicDefault]
   gEfiMdeModulePkgTokenSpaceGuid.PcdEmuVariableNvStoreReserved         | 0
   gEfiMdeModulePkgTokenSpaceGuid.PcdPciDisableBusEnumeration           | FALSE
-  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution          | 800
-  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution            | 600
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoHorizontalResolution          | 1024
+  gEfiMdeModulePkgTokenSpaceGuid.PcdVideoVerticalResolution            | 768
   gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut                      | 3
 
-  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoHorizontalResolution     | 640
-  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution       | 480
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoHorizontalResolution     | 1024
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution       | 768
 
   gEfiMdePkgTokenSpaceGuid.PcdPciIoTranslation                         | 0x0
 

@@ -48,6 +48,14 @@ jobs:
             > /tmp/DdrEntry.merged.S
           mv /tmp/DdrEntry.merged.S \
             edk2/Platform/Loongson/Loongson2K1000Pkg/Sec/PreMem/DdrEntry.S
+          # brand the boot logo + sharper setup resolution for both targets
+          cp assets/logo.bmp edk2/MdeModulePkg/Logo/Logo.bmp
+          sed -i \
+            -e 's/PcdVideoHorizontalResolution          | 800/PcdVideoHorizontalResolution          | 1024/' \
+            -e 's/PcdVideoVerticalResolution            | 600/PcdVideoVerticalResolution            | 768/' \
+            -e 's/PcdSetupVideoHorizontalResolution     | 640/PcdSetupVideoHorizontalResolution     | 1024/' \
+            -e 's/PcdSetupVideoVerticalResolution       | 480/PcdSetupVideoVerticalResolution       | 768/' \
+            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
           # compile the platform DTB before the build consumes it
           D=edk2/Platform/Loongson/Loongson2K1000Pkg/Dts
           cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I $D/include \
