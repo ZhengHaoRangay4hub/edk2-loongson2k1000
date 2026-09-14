@@ -539,4 +539,11 @@
 
   MSFT:*_*_*_CC_FLAGS = /GL-
 
+  #
+  # GCC/EDK2 builds enable -Werror; demote the warning classes that only
+  # appear with GCC for this third-party code (upstream only ships MSVC
+  # suppressions).
+  #
+  GCC:*_*_*_CC_FLAGS = -Wno-error=char-subscripts -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=discarded-qualifiers
+
   GCC:*_*_*_CC_FLAGS = -Wno-format
