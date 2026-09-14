@@ -117,7 +117,7 @@ int8_t lv_area_diff(lv_area_t res_p[], const lv_area_t * a1_p, const lv_area_t *
     if(lv_area_is_in(a1_p, a2_p, 0)) return 0;
 
     /*Result counter*/
-    int8_t res_c = 0;
+    int32_t res_c = 0;
 
     /*Get required information*/
     lv_area_t n;
