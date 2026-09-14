@@ -2,33 +2,9 @@
 #include "LvglLibCommon.h"
 
 #include <Library/LvglLib.h>
-#include <Library/LvglUiConfigLib.h>
-#include <Library/LvglThemeLib.h>
 
 extern UINT8  mExitBtnYes;
 
-//
-// Read the persisted UI scale selection. Returns LVGL_UI_SCALE_DEFAULT (1x) if
-// the variable is absent, malformed, or holds an unknown value.
-//
-// The variable is only consumed at display-creation time, which happens once a
-// GOP is available (BDS). Variable services are up well before that, so the
-// value is always readable when it matters.
-//
-STATIC
-UINT8
-LvglGetUiScale (
-  VOID
-  )
-{
-  LVGL_UI_CONFIG_VARSTORE_DATA  Config;
-
-  LvglUiConfigLoad (&Config);
-  return Config.UiScale;
-}
-
-// mTickSupport stays FALSE permanently (tick_get_cb / UefiLvglTickInit removed).
-// Kept because LvglDisplayEngineDxe/LvglFormRenderer.c references it via extern.
 BOOLEAN  mTickSupport = FALSE;
 STATIC BOOLEAN  mUefiLvglInitDone = FALSE;
 
@@ -44,53 +20,60 @@ static void efi_lv_log_print(lv_log_level_t level, const char * buf)
 #endif
 
 
+static uint32_t tick_get_cb(void)
+{
+  return (UINT32) DivU64x32 (GetTimeInNanoSecond (GetPerformanceCounter()), 1000 * 1000);
+}
+
+VOID
+EFIAPI
+UefiLvglTickInit (
+  VOID
+  )
+{
+  if (GetPerformanceCounter()) {
+    mTickSupport = TRUE;
+    lv_tick_set_cb(tick_get_cb);
+  }
+}
+
+
 EFI_STATUS
 EFIAPI
 UefiLvglInit (
   VOID
   )
 {
-  EFI_HANDLE                         GopHandle;
-  lv_display_t                       *Display;
-  UINT8                              UiScale;
+  EFI_GRAPHICS_OUTPUT_PROTOCOL       *GraphicsOutput;
+  EFI_STATUS                         Status;
+  UINTN                              Width, Heigth;
 
   if (mUefiLvglInitDone) {
     return EFI_SUCCESS;
   }
 
-  // lv_uefi_init must be called before lv_init() so the LVGL UEFI backend
-  // (lv_uefi_platform_init, invoked from lv_init) finds valid EFI globals.
-  lv_uefi_init (gImageHandle, gST);
+  Status = gBS->LocateProtocol (&gEfiGraphicsOutputProtocolGuid, NULL, (VOID **) &GraphicsOutput);
+  if (EFI_ERROR(Status)) {
+    return EFI_UNSUPPORTED;
+  }
 
   lv_init();
+
+#if 0
+  // Need real TimerLib
+  UefiLvglTickInit();
+#endif
 
 #if LV_USE_LOG
   lv_log_register_print_cb (efi_lv_log_print);
 #endif
 
-  // Use LVGL's built-in UEFI display driver. lv_uefi_display_get_any()
-  // returns the first handle with EFI_GRAPHICS_OUTPUT_PROTOCOL installed.
-  GopHandle = lv_uefi_display_get_any ();
-  if (GopHandle == NULL) {
-    lv_deinit ();
-    return EFI_UNSUPPORTED;
-  }
+  Width  = GraphicsOutput->Mode->Info->HorizontalResolution;
+  Heigth = GraphicsOutput->Mode->Info->VerticalResolution;
 
-  //
-  // Always render at the physical framebuffer resolution. UiScale selects
-  // larger fonts and layout metrics via LvglThemeLib (see LvglTheme.h).
-  //
-  UiScale = LvglGetUiScale ();
-  LvglThemeInitFromUiScale (UiScale);
+  lv_disp_t *display = lv_uefi_disp_create (Width, Heigth);
 
-  Display = lv_uefi_display_create (GopHandle);
-
-  if (Display == NULL) {
-    lv_deinit ();
-    return EFI_UNSUPPORTED;
-  }
-
-  lv_port_indev_init(Display);
+  lv_port_indev_init(display);
 
   mUefiLvglInitDone = TRUE;
 

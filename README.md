@@ -127,17 +127,18 @@ build -b RELEASE -t GCC -a LOONGARCH64 -p Platform/Loongson/Loongson2K1000Pkg/Lo
 移植新增代码遵循 BSD-2-Clause-Patent（与 edk2 一致）；移植的 PMON 汇编
 遵循其原始 BSD 授权（见文件头）。
 
-## 图形化前端（WIP）：LVGL 富控件渲染器
+## 图形化前端：LVGL（移植自上游 YangGangUEFI/LvglPkg）
 
-集成了开源的 [LvglPkg](https://github.com/hamitcan99/LvglPkg)（LVGL 官方
-论坛发布的 EDK II 图形 HII 渲染器）：保留 `SetupBrowserDxe` 的表单逻辑，
-用 `LvglDisplayEngineDxe` 把 HII 表单渲染为 LVGL 富控件（按钮/下拉/滚动/
-图片主题），直接画到 GOP 帧缓冲 —— 目标是现代 Aptio V 风格的图形化 BIOS。
+集成了上游原版 [YangGangUEFI/LvglPkg](https://github.com/YangGangUEFI/LvglPkg)
+（LVGL 在 UEFI 环境的官方移植包，pin 的 lvgl 提交与本仓库一致）：
 
-当前状态：LoongArch64 已加入 LVGL 架构门控、freestanding 头文件 shim 齐
-备、双目标 CI 绿灯；QEMU 中已确认 LVGL 在 GOP 上出图，但渲染分辨率/步进
-对齐仍需迭代（图形界面存在错位），文本主题 UI（docs/img/setup-theme.png）
-作为回退始终可用。
+- `LvglPkg/Library/LvglLib`：LVGL 库的 UEFI 移植（GOP 显示 + 键盘/鼠标输入 +
+  ESC 退出），已适配 LoongArch64（架构门控 + freestanding 头文件 shim +
+  `-Werror` 修正），随固件构建。
+- `LvglPkg/Application/UefiDashboard`：图形化系统仪表盘（启动项
+  "UEFI Dashboard (LVGL)"，也可从 Shell 运行），展示 CPU/内存/启动项/时间等
+  信息卡片，键盘/鼠标可交互。
+- `LvglPkg/Application/LvglDemoApp`：LVGL 控件演示。
 
-超频页（LoongsonOverclockDxe，中文表单）同时兼容两种渲染器：文本模式下
-为标准 HII 表单，LVGL 模式下自动映射为富控件。
+上游包本身不包含 HII 表单渲染器（BIOS 设置页仍是本仓库的主题化文本引擎，
+见上文"厂商风格 Setup 主题"）。

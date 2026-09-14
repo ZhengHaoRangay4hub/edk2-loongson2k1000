@@ -60,6 +60,7 @@ typedef uint64_t  uint_fast64_t;
 
 #define calloc(n, s)                      AllocateZeroPool((n)*(s))
 #define memcpy(dest,source,count)         CopyMem(dest,source,(UINTN)(count))
+// #define memset(dest,ch,count)             SetMem(dest,(UINTN)(count),(UINT8)(ch))
 #define memchr(buf,ch,count)              ScanMem8(buf,(UINTN)(count),(UINT8)ch)
 #define memcmp(buf1,buf2,count)           (int)(CompareMem(buf1,buf2,(UINTN)(count)))
 #define memmove(dest,source,count)        CopyMem(dest,source,(UINTN)(count))
@@ -107,6 +108,10 @@ strncat (
 #define MAX_STRING_SIZE  0x1000
 #define strlen(str)                       (size_t)(AsciiStrnLenS(str,MAX_STRING_SIZE))
 #define strnlen(str, count)               (size_t)(AsciiStrnLenS(str, count))
+// #define strcpy(strDest,strSource)         AsciiStrCpyS(strDest,MAX_STRING_SIZE,strSource)
+// #define strncpy(strDest,strSource,count)  AsciiStrnCpyS(strDest,MAX_STRING_SIZE,strSource,(UINTN)count)
+// #define strcat(strDest,strSource)         AsciiStrCatS(strDest,MAX_STRING_SIZE,strSource)
+// #define strncat(strDest,strSource,count)  AsciiStrnCatS(strDest,MAX_STRING_SIZE,strSource,(UINTN)count)
 #define strncmp(string1,string2,count)    (int)(AsciiStrnCmp(string1,string2,(UINTN)(count)))
 #define strcasecmp(str1,str2)             (int)AsciiStriCmp(str1,str2)
 #define strcmp(str1,str2)                 (int)AsciiStrCmp (str1,str2)

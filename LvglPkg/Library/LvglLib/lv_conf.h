@@ -60,12 +60,12 @@
  */
 #define LV_USE_STDLIB_SPRINTF   LV_STDLIB_BUILTIN
 
-#define LV_STDINT_INCLUDE       "stdint.h"
-#define LV_STDDEF_INCLUDE       "stddef.h"
+#define LV_STDINT_INCLUDE       <stdint.h>
+#define LV_STDDEF_INCLUDE       <stddef.h>
 #define LV_STDBOOL_INCLUDE      <stdbool.h>
-#define LV_INTTYPES_INCLUDE     "inttypes.h"
-#define LV_LIMITS_INCLUDE       "limits.h"
-#define LV_STDARG_INCLUDE       "stdarg.h"
+#define LV_INTTYPES_INCLUDE     <inttypes.h>
+#define LV_LIMITS_INCLUDE       <limits.h>
+#define LV_STDARG_INCLUDE       <stdarg.h>
 
 #if LV_USE_STDLIB_MALLOC == LV_STDLIB_BUILTIN
     /** Size of memory available for `lv_malloc()` in bytes (>= 2kB) */
@@ -457,7 +457,7 @@
  *-----------*/
 
 /** Enable log module */
-#define LV_USE_LOG 0
+#define LV_USE_LOG 1
 #if LV_USE_LOG
     /** Set value to one of the following levels of logging detail:
      *  - LV_LOG_LEVEL_TRACE    Log detailed information.
@@ -661,12 +661,12 @@
 #define LV_FONT_MONTSERRAT_24 1
 #define LV_FONT_MONTSERRAT_26 0
 #define LV_FONT_MONTSERRAT_28 0
-#define LV_FONT_MONTSERRAT_30 1
-#define LV_FONT_MONTSERRAT_32 1
+#define LV_FONT_MONTSERRAT_30 0
+#define LV_FONT_MONTSERRAT_32 0
 #define LV_FONT_MONTSERRAT_34 0
 #define LV_FONT_MONTSERRAT_36 0
 #define LV_FONT_MONTSERRAT_38 0
-#define LV_FONT_MONTSERRAT_40 1
+#define LV_FONT_MONTSERRAT_40 0
 #define LV_FONT_MONTSERRAT_42 0
 #define LV_FONT_MONTSERRAT_44 0
 #define LV_FONT_MONTSERRAT_46 0
@@ -1417,9 +1417,9 @@
 #define LV_USE_WINDOWS    0
 
 /** LVGL UEFI backend */
-#define LV_USE_UEFI 1
+#define LV_USE_UEFI 0
 #if LV_USE_UEFI
-    #define LV_USE_UEFI_INCLUDE "lv_uefi_edk2.h"   /**< EDK2 framework header bindings for LVGL UEFI backend */
+    #define LV_USE_UEFI_INCLUDE "myefi.h"   /**< Header that hides the actual framework (EDK2, gnu-efi, ...) */
     #define LV_UEFI_USE_MEMORY_SERVICES 0   /**< Use the memory functions from the boot services table */
 #endif
 

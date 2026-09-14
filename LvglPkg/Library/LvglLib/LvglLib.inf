@@ -24,6 +24,7 @@
   LvglUefiPort.c
 
   EscExitHandler.c
+  lv_uefi_display.c
   MouseCursorIcon.c
   lv_port_indev.c
   lv_conf.h
@@ -254,6 +255,9 @@
   lvgl/src/drivers/sdl/lv_sdl_window.c
   lvgl/src/drivers/uefi/lv_uefi_context.c
   lvgl/src/drivers/uefi/lv_uefi_display.c
+  lvgl/src/drivers/uefi/lv_uefi_indev_keyboard.c
+  lvgl/src/drivers/uefi/lv_uefi_indev_pointer.c
+  lvgl/src/drivers/uefi/lv_uefi_indev_touch.c
   lvgl/src/drivers/uefi/lv_uefi_private.c
   lvgl/src/drivers/wayland/lv_wayland.c
   lvgl/src/drivers/wayland/lv_wl_egl_backend.c
@@ -511,17 +515,21 @@
 [LibraryClasses]
   UefiLib
   UefiBootServicesTableLib
+  UefiApplicationEntryPoint
   MemoryAllocationLib
   BaseMemoryLib
   DebugLib
   PrintLib
   BaseLib
-  LvglUiConfigLib
-  LvglThemeLib
+  TimerLib
+
+[Guids]
 
 [Protocols]
   gEfiGraphicsOutputProtocolGuid
   gEfiAbsolutePointerProtocolGuid
+  gEfiSimplePointerProtocolGuid
+  gEfiDevicePathProtocolGuid
   gEfiSimpleTextInputExProtocolGuid
 
 [BuildOptions]
