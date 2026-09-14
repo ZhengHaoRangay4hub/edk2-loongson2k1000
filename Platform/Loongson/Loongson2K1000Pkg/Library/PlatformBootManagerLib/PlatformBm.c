@@ -23,6 +23,7 @@
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/PciIo.h>
 #include <Protocol/PciRootBridgeIo.h>
+#include <Protocol/SimpleTextOut.h>
 #include <Protocol/VirtioDevice.h>
 #include <Guid/EventGroup.h>
 #include <Guid/GlobalVariable.h>
@@ -798,6 +799,12 @@ PlatformRegisterOptionsAndKeys (
   > Authentication action: 1. connect Auth devices;
   >                        2. Identify auto logon user.
 **/
+STATIC
+VOID
+PlatformPreferGraphicsConsole (
+  VOID
+  );
+
 VOID
 EFIAPI
 PlatformBootManagerBeforeConsole (
@@ -805,6 +812,12 @@ PlatformBootManagerBeforeConsole (
   )
 {
   PublishFdtConfigurationTable ();
+
+  //
+  // Give the BIOS UI the whole screen: only the graphics console stays in
+  // ConOut, so the console can use its full-screen text mode.
+  //
+  PlatformPreferGraphicsConsole ();
 
   UINT16         FrontPageTimeout;
   RETURN_STATUS  PcdStatus;
@@ -1017,6 +1030,138 @@ UninstallEfiMemoryAttributesProtocol (
   > Special boot: e.g.: USB boot, enter UI
 **/
 VOID
+/**
+  When a graphics console is available, make it the only ConOut device.
+
+  ConSplitterDxe intersects the text modes of all ConOut devices, and the
+  serial terminal only offers the fixed 80x25/80x50/100x31 set. Keeping the
+  terminal in ConOut would cap the BIOS UI to a small centered region instead
+  of the full screen at whatever resolution the GOP provides. Serial DEBUG
+  output is not affected: DebugLib writes through SerialPortLib, which does
+  not go through ConOut.
+**/
+STATIC
+VOID
+PlatformPreferGraphicsConsole (
+  VOID
+  )
+{
+  EFI_STATUS                Status;
+  EFI_HANDLE                *HandleBuffer;
+  UINTN                     HandleCount;
+  UINTN                     Index;
+  EFI_DEVICE_PATH_PROTOCOL  *DevicePath;
+  EFI_DEVICE_PATH_PROTOCOL  *GraphicsDevicePath;
+  VOID                      *Gop;
+  VOID                      *SimpleTextOut;
+
+  HandleBuffer       = NULL;
+  GraphicsDevicePath = NULL;
+
+  Status = gBS->LocateHandleBuffer (
+                  ByProtocol,
+                  &gEfiSimpleTextOutProtocolGuid,
+                  NULL,
+                  &HandleCount,
+                  &HandleBuffer
+                  );
+  if (EFI_ERROR (Status)) {
+    return;
+  }
+
+  //
+  // Locate the graphics console (a GOP-backed SimpleTextOut device).
+  //
+  for (Index = 0; Index < HandleCount; Index++) {
+    if (EFI_ERROR (gBS->HandleProtocol (HandleBuffer[Index], &gEfiGraphicsOutputProtocolGuid, &Gop))) {
+      continue;
+    }
+
+    if (EFI_ERROR (gBS->HandleProtocol (HandleBuffer[Index], &gEfiSimpleTextOutProtocolGuid, &SimpleTextOut))) {
+      continue;
+    }
+
+    GraphicsDevicePath = DevicePathFromHandle (HandleBuffer[Index]);
+    if (GraphicsDevicePath != NULL) {
+      break;
+    }
+  }
+
+  if (GraphicsDevicePath == NULL) {
+    //
+    // No graphics console (headless): keep the serial console as-is.
+    //
+    FreePool (HandleBuffer);
+    return;
+  }
+
+  //
+  // Drop the other console devices from ConOut, then make sure the graphics
+  // console itself is present (also covers a fresh NVRAM with no variable).
+  //
+  for (Index = 0; Index < HandleCount; Index++) {
+    if (EFI_ERROR (gBS->HandleProtocol (HandleBuffer[Index], &gEfiGraphicsOutputProtocolGuid, &Gop))) {
+      DevicePath = DevicePathFromHandle (HandleBuffer[Index]);
+      if (DevicePath != NULL) {
+        EfiBootManagerUpdateConsoleVariable (ConOut, NULL, DevicePath);
+      }
+    }
+  }
+
+  EfiBootManagerUpdateConsoleVariable (ConOut, GraphicsDevicePath, NULL);
+
+  FreePool (HandleBuffer);
+}
+
+/**
+  Select the largest text mode of the console so the BIOS UI fills the whole
+  screen, at whatever resolution the GOP provides.
+**/
+STATIC
+VOID
+PlatformSelectLargestConsoleMode (
+  VOID
+  )
+{
+  EFI_STATUS  Status;
+  UINTN       MaxMode;
+  UINTN       Index;
+  UINTN       BestMode;
+  UINTN       BestArea;
+  UINTN       Columns;
+  UINTN       Rows;
+
+  if (gST->ConOut == NULL) {
+    return;
+  }
+
+  BestMode = 0;
+  BestArea = 0;
+  MaxMode  = gST->ConOut->Mode->MaxMode;
+
+  for (Index = 0; Index < MaxMode; Index++) {
+    Status = gST->ConOut->QueryMode (gST->ConOut, Index, &Columns, &Rows);
+    if (EFI_ERROR (Status)) {
+      continue;
+    }
+
+    if ((Columns * Rows) > BestArea) {
+      BestArea = Columns * Rows;
+      BestMode = Index;
+    }
+  }
+
+  gST->ConOut->SetMode (gST->ConOut, BestMode);
+  DEBUG ((DEBUG_INFO, "%a: console text mode %d selected\n", __func__, BestMode));
+}
+
+/**
+  Do platform specific initialization action.
+
+  @retval EFI_SUCCESS                Platform specific initialization succeeded.
+  @retval EFI_OUT_OF_RESOURCES       No enough memory to cache the boot logo.
+**/
+EFI_STATUS
 EFIAPI
 PlatformBootManagerAfterConsole (
   VOID
@@ -1024,6 +1169,11 @@ PlatformBootManagerAfterConsole (
 {
   BOOLEAN        Uninstall;
   BOOLEAN        ShellEnabled;
+
+  //
+  // Make the BIOS UI use the whole screen before it is drawn.
+  //
+  PlatformSelectLargestConsoleMode ();
 
   //
   // Show the splash screen.

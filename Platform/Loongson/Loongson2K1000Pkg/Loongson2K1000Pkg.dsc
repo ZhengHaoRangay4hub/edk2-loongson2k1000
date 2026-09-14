@@ -332,6 +332,16 @@
   gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution       | 768
 
   #
+  # Console auto-sizing: 0 selects the largest text mode of the active GOP
+  # mode, so the BIOS UI fills the screen at any resolution (same values as
+  # OvmfPkg/Include/Dsc/OvmfDisplayPcds.dsc.inc).
+  #
+  gEfiMdeModulePkgTokenSpaceGuid.PcdConOutColumn                        | 0
+  gEfiMdeModulePkgTokenSpaceGuid.PcdConOutRow                           | 0
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutColumn                   | 0
+  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutRow                      | 0
+
+  #
   # Loongson setup theme: inverted selection, lightgray field text,
   # gold subtitles (matches the boot splash palette).
   #

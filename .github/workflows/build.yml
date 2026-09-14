@@ -75,6 +75,10 @@ jobs:
             -e 's/PcdSetupVideoHorizontalResolution     | 640/PcdSetupVideoHorizontalResolution     | 1024/' \
             -e 's/PcdSetupVideoVerticalResolution       | 480/PcdSetupVideoVerticalResolution       | 768/' \
             edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
+          # console auto-sizing: 0 = largest text mode of the current mode, so
+          # the BIOS UI fills the screen at any resolution
+          sed -i 's#\(gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution.*\)#\1\n  gEfiMdeModulePkgTokenSpaceGuid.PcdConOutColumn | 0\n  gEfiMdeModulePkgTokenSpaceGuid.PcdConOutRow | 0\n  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutColumn | 0\n  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutRow | 0#' \
+            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
           # LVGL graphical renderer is WIP (framebuffer stride misalignment);
           # uncomment the two swaps below to build with LVGL instead of the
           # text theme engine.

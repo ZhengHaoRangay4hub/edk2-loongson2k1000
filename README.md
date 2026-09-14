@@ -78,6 +78,14 @@ build -b RELEASE -t GCC -a LOONGARCH64 -p Platform/Loongson/Loongson2K1000Pkg/Lo
   SEC → PEI → DXE → BDS 全链跑通，BDS 正常报告无可引导设备并进入
   Boot Manager；UiApp 设置界面（FrontPage / Device Manager / Boot
   Manager / Boot Maintenance Manager / 语言选择）经串口终端完整渲染。
+- **BIOS 界面分辨率自适应**：控制台不再锁定 80×25。四个控制台 PCD
+  （`PcdConOutColumn/Row`、`PcdSetupConOutColumn/Row`）设为 0（与 OVMF
+  `OvmfDisplayPcds.dsc.inc` 同款），启动时 BDS 自动选择当前分辨率下最大的
+  文本模式；同时 `PlatformBm` 让图形控制台独占 ConOut（ConSplitterDxe 会对
+  所有 ConOut 设备取文本模式交集，串口终端的固定 80×25/80×50/100×31 会把
+  BIOS 界面限制成屏幕中间的小方块）。串口仍输出 DEBUG 日志（不经过 ConOut）。
+  效果：1024×768 下界面满屏 128×40，任何分辨率自动适配；纯串口（无显卡）
+  环境保持原样。
 - **开机 Logo**：自制发光"龙"启动画面（`assets/logo.bmp`，1024×512，
   Setup 控制台 1024×768），CI 构建时替换上游默认 Logo，
   见 [docs/img/boot-splash.png](docs/img/boot-splash.png)。
