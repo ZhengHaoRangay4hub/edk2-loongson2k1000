@@ -75,10 +75,13 @@ jobs:
             -e 's/PcdSetupVideoHorizontalResolution     | 640/PcdSetupVideoHorizontalResolution     | 1024/' \
             -e 's/PcdSetupVideoVerticalResolution       | 480/PcdSetupVideoVerticalResolution       | 768/' \
             edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
-          sed -i 's#MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf#LvglPkg/LvglDisplayEngineDxe/LvglDisplayEngineDxe.inf#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
-          sed -i 's#INF  MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf#INF  LvglPkg/LvglDisplayEngineDxe/LvglDisplayEngineDxe.inf#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.fdf
+          # LVGL graphical renderer is WIP (framebuffer stride misalignment);
+          # uncomment the two swaps below to build with LVGL instead of the
+          # text theme engine.
+          # sed -i 's#MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf#LvglPkg/LvglDisplayEngineDxe/LvglDisplayEngineDxe.inf#' \
+          #   edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
+          # sed -i 's#INF  MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf#INF  LvglPkg/LvglDisplayEngineDxe/LvglDisplayEngineDxe.inf#' \
+          #   edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.fdf
           # compile the platform DTB before the build consumes it
           D=edk2/Platform/Loongson/Loongson2K1000Pkg/Dts
           cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I $D/include \
