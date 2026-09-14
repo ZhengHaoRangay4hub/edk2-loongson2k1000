@@ -31,6 +31,8 @@
   PcdLib
   PciLib
   UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib
   UefiLib
 
 [Guids]
