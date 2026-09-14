@@ -81,6 +81,18 @@ build -b RELEASE -t GCC -a LOONGARCH64 -p Platform/Loongson/Loongson2K1000Pkg/Lo
 - **开机 Logo**：自制发光"龙"启动画面（`assets/logo.bmp`，1024×512，
   Setup 控制台 1024×768），CI 构建时替换上游默认 Logo，
   见 [docs/img/boot-splash.png](docs/img/boot-splash.png)。
+- **厂商风格 Setup 主题**：fork EDK2 的 `CustomizedDisplayLib`（厂商定制
+  BIOS 界面的官方机制）为 `LoongsonSetupThemeLib`：深蓝底色 + 金色
+  "LOONGSON 2K1000LA" FrontPage 横幅 + 反色选中 + 青色帮助栏，
+  见 [docs/img/setup-theme.png](docs/img/setup-theme.png)；QEMU 与
+  教育派两套固件同享该主题。
+- **HDMI 点亮（教育派）**：`LoongsonDisplayDxe` 驱动片上显示控制器
+  （PCI 0:6:0，双 DVO 管道 1024x768-32@60，像素 PLL 按分辨率搜索），
+  经 I2C1(0x1fe21800) 初始化 SII9022A HDMI 发送器（PMON 9022a.c 序列），
+  分配扫描out帧buffer并发布 GOP，同时把启动 Logo 刷上屏；接入
+  GraphicsConsoleDxe 后固件文字控制台同步出现在 HDMI。序列移植自
+  PMON `dc.c`/`9022a.c`/`i2c.c`；**编译验证通过，实机点灯待教育派
+  上电确认**（QEMU 无法模拟 2K1000LA 的 DC）。
 - **OpenWrt 24.10.1 实机引导验证**（loongarch64/generic 官方镜像，
   无需任何修改）：
 
