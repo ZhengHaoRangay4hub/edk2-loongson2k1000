@@ -20,6 +20,9 @@
         #elif defined(__aarch64__)
             #define __LV_UEFI_ARCH_AARCH64__
             #define __LV_UEFI_64BIT__
+        #elif defined(__loongarch64)
+            #define __LV_UEFI_ARCH_LOONGARCH64__
+            #define __LV_UEFI_64BIT__
         #else
             #error Architecture is not supported
         #endif
