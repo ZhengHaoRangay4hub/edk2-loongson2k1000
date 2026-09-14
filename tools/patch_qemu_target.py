@@ -38,19 +38,33 @@ def set_pcd(text, name, value):
     return text
 
 
-def ensure_after(text, anchor, lines):
-    """Insert `lines` after the line containing `anchor` unless already there."""
+def _insert(text, anchor, lines, before, scope_from=None):
+    """Insert `lines` next to `anchor` unless they are already present."""
     missing = [l for l in lines if l.strip() and l.strip() not in text]
     if not missing:
         return text
-    idx = text.find(anchor)
+    start = text.find(scope_from) if scope_from else 0
+    if start == -1:
+        log.append("!! section not found: %s" % scope_from)
+        return text
+    idx = text.find(anchor, start)
     if idx == -1:
         log.append("!! anchor not found: %s" % anchor)
         return text
-    end = text.find('\n', idx) + 1
     add = ''.join('  %s\n' % l for l in missing)
-    log.append("inserted after '%s': %s" % (anchor.strip()[:40], ', '.join(m.split('/')[-1] for m in missing)))
-    return text[:end] + add + text[end:]
+    where = 'before' if before else 'after'
+    pos = text.rfind('\n', 0, idx) + 1 if before else text.find('\n', idx) + 1
+    log.append("inserted %s '%s': %s" % (
+        where, anchor.strip()[:44], ', '.join(m.split('/')[-1] for m in missing)))
+    return text[:pos] + add + text[pos:]
+
+
+def ensure_before(text, anchor, lines, scope_from=None):
+    return _insert(text, anchor, lines, True, scope_from)
+
+
+def ensure_after(text, anchor, lines, scope_from=None):
+    return _insert(text, anchor, lines, False, scope_from)
 
 
 def write_if_changed(path, text):
@@ -72,11 +86,19 @@ def patch_dsc(path):
 
     # LVGL library class
     if LVGL_LIB not in text:
-        text = ensure_after(text, 'CustomizedDisplayLib             |', ['LvglLib                          | ' + LVGL_LIB])
+        text = ensure_after(
+            text,
+            'CustomizedDisplayLib             |',
+            ['LvglLib                          | ' + LVGL_LIB],
+            scope_from='[LibraryClasses')
 
     # components: LVGL applications + the boot manager menu popup
     components = [BOOT_MENU_APP] + APPS
-    text = ensure_after(text, 'MdeModulePkg/Application/UiApp/UiApp.inf', components)
+    text = ensure_before(
+        text,
+        'MdeModulePkg/Application/UiApp/UiApp.inf',
+        components,
+        scope_from='[Components]')
 
     # video / console PCDs
     text = set_pcd(text, 'PcdVideoHorizontalResolution', '1024')
@@ -107,7 +129,7 @@ def patch_dsc(path):
 def patch_fdf(path):
     text = open(path).read()
     in_lines = ['INF  ' + m for m in [BOOT_MENU_APP] + APPS]
-    text = ensure_after(text, 'INF  ' + UI_APP, in_lines)
+    text = ensure_before(text, 'INF  ' + UI_APP, in_lines)
     if write_if_changed(path, text):
         log.append("fdf written")
     else:
