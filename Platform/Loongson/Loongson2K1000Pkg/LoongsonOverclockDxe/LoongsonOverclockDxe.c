@@ -37,7 +37,7 @@
 #define PLL_POWER_DOWN          (1ULL << 19)
 
 extern UINT8  OverclockFormsBin[];
-extern UINT8  OverclockStringsBin[];
+extern UINT8  LoongsonOverclockDxeStrings[];
 
 STATIC LOONGSON_OC_CONFIG               mOcConfig;
 STATIC EFI_HII_CONFIG_ACCESS_PROTOCOL   mConfigAccess;
@@ -322,7 +322,7 @@ LoongsonOverclockDxeEntryPoint (
   mHiiHandle = HiiAddPackages (
                  &mOcFormsetGuid,
                  mDriverHandle,
-                 OverclockStringsBin,
+                 LoongsonOverclockDxeStrings,
                  OverclockFormsBin,
                  NULL
                  );
