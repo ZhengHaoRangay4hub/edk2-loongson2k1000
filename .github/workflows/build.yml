@@ -53,6 +53,13 @@ jobs:
           # vendor-style setup theme for both targets
           sed -i 's#MdeModulePkg/Library/CustomizedDisplayLib/CustomizedDisplayLib.inf#Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf#' \
             edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
+          # graphical setup console + graphical boot manager menu (QEMU)
+          sed -i 's#INF  MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf#INF  MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsoleDxe.inf\nINF  MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf#' \
+            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.fdf
+          sed -i 's#INF  MdeModulePkg/Application/UiApp/UiApp.inf#INF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf\nINF  MdeModulePkg/Application/UiApp/UiApp.inf#' \
+            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.fdf
+          sed -i 's#{ 0x21, 0xaa, 0x2c, 0x46, 0x14, 0x76, 0x03, 0x45, 0x83, 0x6e, 0x8a, 0xb6, 0xf4, 0x66, 0x23, 0x31 }#{ 0x66, 0x7d, 0xc4, 0xe9, 0x08, 0xfc, 0xd3, 0x4c, 0xa3, 0x9f, 0x3e, 0xa3, 0x3e, 0xb3, 0x4c, 0x5a }#' \
+            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
           sed -i \
             -e 's/PcdVideoHorizontalResolution          | 800/PcdVideoHorizontalResolution          | 1024/' \
             -e 's/PcdVideoVerticalResolution            | 600/PcdVideoVerticalResolution            | 768/' \

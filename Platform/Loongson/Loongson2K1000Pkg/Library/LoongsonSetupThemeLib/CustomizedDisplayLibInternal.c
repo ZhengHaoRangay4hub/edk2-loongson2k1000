@@ -69,7 +69,7 @@ PrintBannerInfo (
 
   Line = gScreenDimensions.TopRow + 3;
   Col  = (gScreenDimensions.RightColumn - gScreenDimensions.LeftColumn - 22) / 2;
-  PrintStringAt (Col, Line, L"EDK II  UEFI  FIRMWARE");
+  PrintStringAt (Col, Line, L"\x9f99\x82af EDK II UEFI \u56fa\u4ef6");
 }
 
 /**

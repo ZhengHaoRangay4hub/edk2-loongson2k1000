@@ -812,6 +812,25 @@ PlatformBootManagerBeforeConsole (
   BOOLEAN        FirmwareSetupEnabled;
 
   //
+  // Default the platform language to Simplified Chinese; the user can
+  // still switch languages from the FrontPage.
+  //
+  {
+    UINTN  LangSize;
+
+    LangSize = 0;
+    if (gRT->GetVariable (L"PlatformLang", &gEfiGlobalVariableGuid, NULL, &LangSize, NULL) == EFI_NOT_FOUND) {
+      gRT->SetVariable (
+             L"PlatformLang",
+             &gEfiGlobalVariableGuid,
+             EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS,
+             sizeof ("zh-Hans"),
+             "zh-Hans"
+             );
+    }
+  }
+
+  //
   // Signal EndOfDxe PI Event
   //
   EfiEventGroupSignal (&gEfiEndOfDxeEventGroupGuid);

@@ -1,0 +1,45 @@
+## @file
+#  Loongson 2K1000LA overclocking setup page (HII).
+#
+#  Copyright (c) 2026, Loongson2K1000LA EDK2 port contributors.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 1.29
+  BASE_NAME                      = LoongsonOverclockDxe
+  FILE_GUID                      = 6b2e8a44-1c5d-4f93-b7a0-3e8d92c5f1b7
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = LoongsonOverclockDxeEntryPoint
+
+[Sources]
+  LoongsonOverclockDxe.c
+  OverclockForms.vfr
+  OverclockStrings.uni
+  OverclockStorage.h
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  HiiLib
+  IoLib
+  MemoryAllocationLib
+  UefiBootServicesTableLib
+  UefiDriverEntryPoint
+  UefiLib
+  UefiRuntimeServicesTableLib
+
+[Protocols]
+  gEfiHiiConfigAccessProtocolGuid                ## PRODUCES
+  gEfiDevicePathProtocolGuid                    ## PRODUCES
+
+[Depex]
+  TRUE
