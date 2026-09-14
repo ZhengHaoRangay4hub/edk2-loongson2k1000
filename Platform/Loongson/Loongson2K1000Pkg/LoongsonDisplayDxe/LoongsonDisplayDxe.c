@@ -71,6 +71,7 @@
 #define CR_READ                 0x20
 #define CR_WRITE                0x10
 #define CR_IACK                 0x01
+#define CR_ACK                  0x08
 #define SR_NOACK                0x80
 #define SR_BUSY                 0x40
 #define SR_TIP                  0x02
