@@ -116,7 +116,7 @@
   SecurityManagementLib            | MdeModulePkg/Library/DxeSecurityManagementLib/DxeSecurityManagementLib.inf
   UefiUsbLib                       | MdePkg/Library/UefiUsbLib/UefiUsbLib.inf
   SerializeVariablesLib            | OvmfPkg/Library/SerializeVariablesLib/SerializeVariablesLib.inf
-  CustomizedDisplayLib             | MdeModulePkg/Library/CustomizedDisplayLib/CustomizedDisplayLib.inf
+  CustomizedDisplayLib             | Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf
   DebugPrintErrorLevelLib          | MdePkg/Library/BaseDebugPrintErrorLevelLib/BaseDebugPrintErrorLevelLib.inf
   VarCheckLib                      | MdeModulePkg/Library/VarCheckLib/VarCheckLib.inf
   TpmMeasurementLib                | MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
@@ -324,6 +324,15 @@
   gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoHorizontalResolution     | 1024
   gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution       | 768
 
+  #
+  # Loongson setup theme: inverted selection, lightgray field text,
+  # gold subtitles (matches the boot splash palette).
+  #
+  gEfiMdeModulePkgTokenSpaceGuid.PcdBrowserFieldTextColor               | 0x07
+  gEfiMdeModulePkgTokenSpaceGuid.PcdBrowserFieldTextHighlightColor      | 0x00
+  gEfiMdeModulePkgTokenSpaceGuid.PcdBrowserFieldBackgroundHighlightColor| 0x07
+  gEfiMdeModulePkgTokenSpaceGuid.PcdBrowserSubtitleTextColor            | 0x0E
+
   gEfiMdePkgTokenSpaceGuid.PcdPciIoTranslation                         | 0x0
 
 [PcdsPatchableInModule.common]
@@ -462,8 +471,14 @@
   #
   # Console
   #
+  Platform/Loongson/Loongson2K1000Pkg/LoongsonDisplayDxe/LoongsonDisplayDxe.inf
+
+  #
+  # Console
+  #
   MdeModulePkg/Universal/Console/ConPlatformDxe/ConPlatformDxe.inf
   MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf
+  MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsoleDxe.inf
   MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf
   MdeModulePkg/Universal/PrintDxe/PrintDxe.inf
   MdeModulePkg/Universal/SerialDxe/SerialDxe.inf

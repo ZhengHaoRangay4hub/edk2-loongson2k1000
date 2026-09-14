@@ -1,0 +1,41 @@
+## @file
+#  Loongson 2K1000LA display controller / SII9022A HDMI GOP driver.
+#
+#  Copyright (c) 2026, Loongson2K1000LA EDK2 port contributors.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 1.29
+  BASE_NAME                      = LoongsonDisplayDxe
+  FILE_GUID                      = 4a7c9e21-8b3d-4f6a-9c5e-2d1b7a8f3e60
+  MODULE_TYPE                    = UEFI_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = LoongsonDisplayDxeEntryPoint
+
+[Sources]
+  LoongsonDisplayDxe.c
+  LoongsonLogo.h
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  CacheMaintenanceLib
+  DebugLib
+  IoLib
+  MemoryAllocationLib
+  PcdLib
+  PciLib
+  UefiBootServicesTableLib
+  UefiLib
+
+[Protocols]
+  gEfiGraphicsOutputProtocolGuid                 ## PRODUCES
+  gEfiPciEnumerationCompleteProtocolGuid         ## CONSUMES
+
+[Depex]
+  gEfiPciEnumerationCompleteProtocolGuid

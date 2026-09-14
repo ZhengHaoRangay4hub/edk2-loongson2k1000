@@ -50,6 +50,9 @@ jobs:
             edk2/Platform/Loongson/Loongson2K1000Pkg/Sec/PreMem/DdrEntry.S
           # brand the boot logo + sharper setup resolution for both targets
           cp assets/logo.bmp edk2/MdeModulePkg/Logo/Logo.bmp
+          # vendor-style setup theme for both targets
+          sed -i 's#MdeModulePkg/Library/CustomizedDisplayLib/CustomizedDisplayLib.inf#Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf#' \
+            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
           sed -i \
             -e 's/PcdVideoHorizontalResolution          | 800/PcdVideoHorizontalResolution          | 1024/' \
             -e 's/PcdVideoVerticalResolution            | 600/PcdVideoVerticalResolution            | 768/' \
