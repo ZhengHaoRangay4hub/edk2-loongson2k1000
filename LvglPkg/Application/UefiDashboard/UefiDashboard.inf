@@ -43,3 +43,10 @@
 [Protocols]
   gEdkiiPlatformLogoProtocolGuid
   gEfiSmbiosProtocolGuid
+
+[BuildOptions]
+  #
+  # Third-party LVGL code: keep upstream sources as-is and demote the
+  # warning classes the EDK2 toolchain turns into errors.
+  #
+  GCC:*_*_*_CC_FLAGS = -Wno-error=char-subscripts -Wno-error=unused-but-set-variable -Wno-error=unused-variable -Wno-error=unused-function -Wno-error=discarded-qualifiers
