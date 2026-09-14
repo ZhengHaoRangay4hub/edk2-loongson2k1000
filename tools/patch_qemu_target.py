@@ -14,6 +14,7 @@ import re
 import sys
 
 THEME_LIB = "Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf"
+BOOT_MGR_LIB = "Platform/Loongson/Loongson2K1000Pkg/Library/PlatformBootManagerLib/PlatformBootManagerLib.inf"
 LVGL_LIB = "LvglPkg/Library/LvglLib/LvglLib.inf"
 APPS = [
     "LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf",
@@ -91,6 +92,14 @@ def patch_dsc(path):
             'CustomizedDisplayLib             |',
             ['LvglLib                          | ' + LVGL_LIB],
             scope_from='[LibraryClasses')
+
+    # platform BDS policy (graphics-only ConOut, largest text mode, the LVGL
+    # setup entry) replaces the upstream light boot manager
+    text = re.sub(
+        r'(\s*)PlatformBootManagerLib\s*\|.*PlatformBootManagerLib\.inf',
+        r'\1PlatformBootManagerLib           | ' + BOOT_MGR_LIB,
+        text, count=1)
+    log.append("PlatformBootManagerLib -> board implementation")
 
     # components: LVGL applications + the boot manager menu popup
     components = [BOOT_MENU_APP] + APPS
