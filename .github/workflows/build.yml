@@ -54,6 +54,11 @@ jobs:
           sed -i 's#MdeModulePkg/Library/CustomizedDisplayLib/CustomizedDisplayLib.inf#Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf#' \
             edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
           # graphical setup console (already in upstream FDF) + graphical boot manager menu
+          # Chinese (zh-Hans) HII translations for the setup UI
+          while read -r f; do
+            mkdir -p "edk2/$(dirname "$f")"
+            cp "assets/hii-zh/$f" "edk2/$f"
+          done < <(cd assets/hii-zh && find . -name '*.uni' | sed 's#^\./##')
           sed -i 's#INF  MdeModulePkg/Application/UiApp/UiApp.inf#INF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf\nINF  MdeModulePkg/Application/UiApp/UiApp.inf#' \
             edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.fdf
           sed -i 's#{ 0x21, 0xaa, 0x2c, 0x46, 0x14, 0x76, 0x03, 0x45, 0x83, 0x6e, 0x8a, 0xb6, 0xf4, 0x66, 0x23, 0x31 }#{ 0xdc, 0x5b, 0xc2, 0xee, 0xf2, 0x67, 0x95, 0x4d, 0xb1, 0xd5, 0xf8, 0x1b, 0x20, 0x39, 0xd1, 0x1d }#' \
