@@ -55,6 +55,8 @@ jobs:
           # vendor-style setup theme for both targets
           sed -i 's#MdeModulePkg/Library/CustomizedDisplayLib/CustomizedDisplayLib.inf#Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf#' \
             edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
+          sed -i 's#  CustomizedDisplayLib             | .*#  CustomizedDisplayLib             | Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf\n  LvglLib                          | LvglPkg/Library/LvglLib/LvglLib.inf\n  LvglThemeLib                     | LvglPkg/Library/LvglThemeLib/LvglThemeLib.inf\n  LvglUiConfigLib                  | LvglPkg/Library/LvglUiConfigLib/LvglUiConfigLib.inf#' \
+            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
           # graphical setup console (already in upstream FDF) + graphical boot manager menu
           # Chinese (zh-Hans) HII translations for the setup UI
           while read -r f; do
