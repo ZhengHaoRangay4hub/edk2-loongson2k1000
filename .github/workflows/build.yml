@@ -20,22 +20,61 @@ jobs:
       - name: Checkout port
         uses: actions/checkout@v4
 
-      - name: Checkout tianocore/edk2
+      #
+      # Incremental build caches
+      #
+      # The edk2 tree (including the Build/ output of the previous run) is
+      # cached per target, so unchanged upstream modules and the LVGL tree
+      # are not recompiled. tools/ci_incremental.py then normalises the
+      # mtimes of our overlay against content hashes, so only what really
+      # changed gets rebuilt.
+      #
+      - name: Restore edk2 tree + build output
+        id: edk2-cache
+        uses: actions/cache@v4
+        with:
+          path: edk2
+          key: edk2-${{ runner.os }}-${{ matrix.target }}-${{ hashFiles('.github/workflows/build.yml') }}
+          restore-keys: |
+            edk2-${{ runner.os }}-${{ matrix.target }}-
+            edk2-${{ runner.os }}-
+
+      - name: Clone tianocore/edk2 (cache miss)
+        if: steps.edk2-cache.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 --branch master --recurse-submodules --shallow-submodules https://github.com/tianocore/edk2.git edk2
           echo "EDK2_SHA=$(git -C edk2 rev-parse HEAD)" | tee -a "$GITHUB_ENV"
+
+      - name: Refresh cached edk2 clone
+        if: steps.edk2-cache.outputs.cache-hit == 'true'
+        working-directory: edk2
+        run: |
+          git fetch --depth 1 origin master
+          git checkout -q FETCH_HEAD
+          git submodule update --init --depth 1
+          echo "EDK2_SHA=$(git rev-parse HEAD)" | tee -a "$GITHUB_ENV"
+
+      - name: Restore LoongArch64 cross toolchain
+        id: tc-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/loongarch64-cross-toolchain
+          key: loongarch64-cross-2024.08.08
 
       - name: Install toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             gcc g++ make python3 python3-pip uuid-dev nasm iasl device-tree-compiler curl xz-utils
-          # Loongson official LoongArch64 cross toolchain (gcc 14.2 / binutils 2.43)
-          curl -sL -o /tmp/cross-tools.tar.xz \
-            https://github.com/loongson/build-tools/releases/download/2024.08.08/x86_64-cross-tools-loongarch64-binutils_2.43-gcc_14.2.0.tar.xz
-          sudo mkdir -p /opt/loongarch64-cross-toolchain
-          sudo tar -xf /tmp/cross-tools.tar.xz -C /opt/loongarch64-cross-toolchain
-          echo "/opt/loongarch64-cross-toolchain/cross-tools/bin" >> "$GITHUB_PATH"
+          TC="${{ runner.tool_cache }}/loongarch64-cross-toolchain"
+          if [ ! -x "$TC/cross-tools/bin/loongarch64-unknown-linux-gnu-gcc" ]; then
+            # Loongson official LoongArch64 cross toolchain (gcc 14.2 / binutils 2.43)
+            curl -sL -o /tmp/cross-tools.tar.xz \
+              https://github.com/loongson/build-tools/releases/download/2024.08.08/x86_64-cross-tools-loongarch64-binutils_2.43-gcc_14.2.0.tar.xz
+            mkdir -p "$TC"
+            tar -xf /tmp/cross-tools.tar.xz -C "$TC"
+          fi
+          echo "$TC/cross-tools/bin" >> "$GITHUB_PATH"
 
       - name: Overlay Loongson2K1000Pkg into edk2 tree
         run: |
@@ -50,48 +89,31 @@ jobs:
             > /tmp/DdrEntry.merged.S
           mv /tmp/DdrEntry.merged.S \
             edk2/Platform/Loongson/Loongson2K1000Pkg/Sec/PreMem/DdrEntry.S
-          # brand the boot logo + sharper setup resolution for both targets
+          # brand the boot logo for both targets
           cp assets/logo.bmp edk2/MdeModulePkg/Logo/Logo.bmp
-          # vendor-style setup theme for both targets
-          sed -i 's#MdeModulePkg/Library/CustomizedDisplayLib/CustomizedDisplayLib.inf#Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
-          sed -i 's#  CustomizedDisplayLib             | .*#  CustomizedDisplayLib             | Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf\n  LvglLib                          | LvglPkg/Library/LvglLib/LvglLib.inf#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
-          # LvglPkg demo apps (graphical dashboard)
-          sed -i 's#  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf#  LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf\n  LvglPkg/Application/UefiDashboard/UefiDashboard.inf\n  LvglPkg/Application/LvglDemoApp/LvglDemoApp.inf\n  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
-          sed -i 's#INF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf#INF  LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf\nINF  LvglPkg/Application/UefiDashboard/UefiDashboard.inf\nINF  LvglPkg/Application/LvglDemoApp/LvglDemoApp.inf\nINF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.fdf
-          # graphical setup console (already in upstream FDF) + graphical boot manager menu
           # Chinese (zh-Hans) HII translations for the setup UI
           while read -r f; do
             mkdir -p "edk2/$(dirname "$f")"
             cp "assets/hii-zh/$f" "edk2/$f"
           done < <(cd assets/hii-zh && find . -name '*.uni' | sed 's#^\./##')
-          sed -i 's#INF  MdeModulePkg/Application/UiApp/UiApp.inf#INF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf\nINF  MdeModulePkg/Application/UiApp/UiApp.inf#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.fdf
-          sed -i 's#{ 0x21, 0xaa, 0x2c, 0x46, 0x14, 0x76, 0x03, 0x45, 0x83, 0x6e, 0x8a, 0xb6, 0xf4, 0x66, 0x23, 0x31 }#{ 0xdc, 0x5b, 0xc2, 0xee, 0xf2, 0x67, 0x95, 0x4d, 0xb1, 0xd5, 0xf8, 0x1b, 0x20, 0x39, 0xd1, 0x1d }#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
-          sed -i 's#  MdeModulePkg/Application/UiApp/UiApp.inf {#  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf\n  MdeModulePkg/Application/UiApp/UiApp.inf {#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
-          sed -i \
-            -e 's/PcdVideoHorizontalResolution          | 800/PcdVideoHorizontalResolution          | 1024/' \
-            -e 's/PcdVideoVerticalResolution            | 600/PcdVideoVerticalResolution            | 768/' \
-            -e 's/PcdSetupVideoHorizontalResolution     | 640/PcdSetupVideoHorizontalResolution     | 1024/' \
-            -e 's/PcdSetupVideoVerticalResolution       | 480/PcdSetupVideoVerticalResolution       | 768/' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
-          # console auto-sizing: 0 = largest text mode of the current mode, so
-          # the BIOS UI fills the screen at any resolution
-          sed -i 's#\(gEfiMdeModulePkgTokenSpaceGuid.PcdSetupVideoVerticalResolution.*\)#\1\n  gEfiMdeModulePkgTokenSpaceGuid.PcdConOutColumn | 0\n  gEfiMdeModulePkgTokenSpaceGuid.PcdConOutRow | 0\n  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutColumn | 0\n  gEfiMdeModulePkgTokenSpaceGuid.PcdSetupConOutRow | 0#' \
-            edk2/OvmfPkg/LoongArchVirt/LoongArchVirtQemu.dsc
-          # NOTE: the BIOS setup UI uses the text theme engine; upstream
-          # LvglPkg ships the LVGL library and apps (UefiDashboard et al.)
-          # rather than an HII renderer, so no DisplayEngine swap here.
+          # QEMU regression target: same platform integration as the board
+          # package (theme library, LVGL apps, console/resolution PCDs).
+          # Idempotent script instead of a chain of order-dependent seds.
+          echo "patched QEMU target:"
+          python3 tools/patch_qemu_target.py edk2
           # compile the platform DTB before the build consumes it
           D=edk2/Platform/Loongson/Loongson2K1000Pkg/Dts
           cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I $D/include \
               $D/ls2k1000-la.dts | \
             dtc -I dts -O dtb -o $D/ls2k1000-la.dtb -
+
+      - name: Normalise overlay timestamps (incremental build)
+        run: |
+          python3 tools/ci_incremental.py edk2/LvglPkg \
+            edk2/Build/.manifest-lvgl.json
+          python3 tools/ci_incremental.py \
+            edk2/Platform/Loongson/Loongson2K1000Pkg \
+            edk2/Build/.manifest-platform.json
 
       - name: Build BaseTools
         working-directory: edk2
