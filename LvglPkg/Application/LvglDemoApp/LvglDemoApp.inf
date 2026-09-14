@@ -11,7 +11,12 @@
 [Defines]
   INF_VERSION                    = 0x00010005
   BASE_NAME                      = LvglDemoApp
-  FILE_GUID                      = 18D17609-0798-4905-8392-E04B9E054F0D  
+  #
+  # Was 18D17609-0798-4905-8392-E04B9E054F0D, which collided with
+  # UefiDashboard.inf (upstream copy/paste bug); two modules with the same
+  # FILE_GUID cannot coexist in one firmware volume.
+  #
+  FILE_GUID                      = 7A3E9D15-2B64-4F80-A1C7-5D38E2946B0F
   MODULE_TYPE                    = UEFI_APPLICATION
   VERSION_STRING                 = 1.0
   ENTRY_POINT                    = UefiMain
