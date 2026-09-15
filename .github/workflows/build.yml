@@ -39,29 +39,35 @@ jobs:
             edk2-${{ runner.os }}-${{ matrix.target }}-
             edk2-${{ runner.os }}-
 
-      - name: Clone tianocore/edk2 (cache miss)
-        if: steps.edk2-cache.outputs.cache-hit != 'true'
+      #
+      # actions/cache reports cache-hit='false' for a restore-key (partial)
+      # match even though it did populate the directory, so decide from the
+      # tree itself whether to clone or to refresh.
+      #
+      - name: Obtain edk2 tree (clone or refresh)
         run: |
-          git clone --depth 1 --branch master --recurse-submodules --shallow-submodules https://github.com/tianocore/edk2.git edk2
+          if [ ! -d edk2/.git ]; then
+            echo "no cached tree, cloning tianocore/edk2"
+            rm -rf edk2
+            git clone --depth 1 --branch master --recurse-submodules --shallow-submodules https://github.com/tianocore/edk2.git edk2
+          else
+            echo "cached tree present, refreshing to upstream master"
+            cd edk2
+            # The cache carries our overlay (Platform/Loongson/Loongson2K1000Pkg,
+            # LvglPkg, the zh-Hans .uni files, the branded logo, the merged DDR
+            # assembly) as local edits and untracked files, plus the incremental
+            # Build/ output.  A plain "checkout FETCH_HEAD" refuses to run once
+            # upstream touches one of those files, so drop the overlay first --
+            # it is re-applied by the overlay step below.  Build/ is excluded:
+            # that is the whole point of caching this tree.
+            git checkout -- .
+            git clean -fdq -e Build
+            git fetch --depth 1 origin master
+            git checkout -q FETCH_HEAD
+            git submodule update --init --depth 1
+            cd ..
+          fi
           echo "EDK2_SHA=$(git -C edk2 rev-parse HEAD)" | tee -a "$GITHUB_ENV"
-
-      - name: Refresh cached edk2 clone
-        if: steps.edk2-cache.outputs.cache-hit == 'true'
-        working-directory: edk2
-        run: |
-          # The cached tree carries our overlay (Platform/Loongson/Loongson2K1000Pkg,
-          # LvglPkg, the zh-Hans .uni files, the branded logo, the merged DDR
-          # assembly) as local edits and untracked files, plus the incremental
-          # Build/ output.  A plain "checkout FETCH_HEAD" refuses to run once
-          # upstream touches one of those files, so drop the overlay first --
-          # it is re-applied by the overlay step below.  Build/ is excluded:
-          # that is the whole point of caching this tree.
-          git checkout -- .
-          git clean -fdq -e Build
-          git fetch --depth 1 origin master
-          git checkout -q FETCH_HEAD
-          git submodule update --init --depth 1
-          echo "EDK2_SHA=$(git rev-parse HEAD)" | tee -a "$GITHUB_ENV"
 
       - name: Restore LoongArch64 cross toolchain
         id: tc-cache
