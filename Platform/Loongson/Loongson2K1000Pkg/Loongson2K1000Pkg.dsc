@@ -101,9 +101,14 @@
   PciCapPciSegmentLib              | OvmfPkg/Library/BasePciCapPciSegmentLib/BasePciCapPciSegmentLib.inf
   PciCapPciIoLib                   | OvmfPkg/Library/UefiPciCapPciIoLib/UefiPciCapPciIoLib.inf
   IoLib                            | MdePkg/Library/BaseIoLibIntrinsic/BaseIoLibIntrinsic.inf
-  FdtSerialPortAddressLib          | OvmfPkg/Library/FdtSerialPortAddressLib/FdtSerialPortAddressLib.inf
-  PlatformHookLib                  | OvmfPkg/LoongArchVirt/Library/Fdt16550SerialPortHookLib/Fdt16550SerialPortHookLib.inf
-  SerialPortLib                    | OvmfPkg/LoongArchVirt/Library/EarlyFdtSerialPortLib16550/EarlyFdtSerialPortLib16550.inf
+  #
+  # Native UART0 driver for the on-chip ns16550-compatible port.  The
+  # OvmfPkg 16550 libraries find the UART through the QEMU device tree,
+  # which does not exist here while SEC/PEI run, so they produced no
+  # output at all on real hardware.
+  #
+  PlatformHookLib                  | MdeModulePkg/Library/BasePlatformHookLibNull/BasePlatformHookLibNull.inf
+  SerialPortLib                    | Platform/Loongson/Loongson2K1000Pkg/Library/Loongson2KSerialPortLib/Loongson2KSerialPortLib.inf
   ResetSystemLib                   | Platform/Loongson/Loongson2K1000Pkg/Library/ResetSystemLib/Loongson2KResetSystemLib.inf
 
   UefiLib                          | MdePkg/Library/UefiLib/UefiLib.inf
@@ -159,7 +164,7 @@
   HobLib                           | MdePkg/Library/PeiHobLib/PeiHobLib.inf
   MemoryAllocationLib              | MdePkg/Library/PeiMemoryAllocationLib/PeiMemoryAllocationLib.inf
   PeiServicesTablePointerLib       | MdePkg/Library/PeiServicesTablePointerLibKs0/PeiServicesTablePointerLibKs0.inf
-  PlatformHookLib                  | OvmfPkg/LoongArchVirt/Library/Fdt16550SerialPortHookLib/EarlyFdt16550SerialPortHookLib.inf
+  PlatformHookLib                  | MdeModulePkg/Library/BasePlatformHookLibNull/BasePlatformHookLibNull.inf
   CpuExceptionHandlerLib           | UefiCpuPkg/Library/CpuExceptionHandlerLib/SecPeiCpuExceptionHandlerLib.inf
 
 [LibraryClasses.common.PEI_CORE]
@@ -171,7 +176,7 @@
   ReportStatusCodeLib              | MdeModulePkg/Library/PeiReportStatusCodeLib/PeiReportStatusCodeLib.inf
   OemHookStatusCodeLib             | MdeModulePkg/Library/OemHookStatusCodeLibNull/OemHookStatusCodeLibNull.inf
   PeCoffGetEntryPointLib           | MdePkg/Library/BasePeCoffGetEntryPointLib/BasePeCoffGetEntryPointLib.inf
-  PlatformHookLib                  | OvmfPkg/LoongArchVirt/Library/Fdt16550SerialPortHookLib/EarlyFdt16550SerialPortHookLib.inf
+  PlatformHookLib                  | MdeModulePkg/Library/BasePlatformHookLibNull/BasePlatformHookLibNull.inf
   PerformanceLib                   | MdeModulePkg/Library/PeiPerformanceLib/PeiPerformanceLib.inf
 
 [LibraryClasses.common.PEIM]
@@ -189,7 +194,7 @@
   CpuMmuLib                        | UefiCpuPkg/Library/CpuMmuLib/CpuMmuLib.inf
   CpuMmuInitLib                    | OvmfPkg/LoongArchVirt/Library/CpuMmuInitLib/CpuMmuInitLib.inf
   MpInitLib                        | UefiCpuPkg/Library/MpInitLib/PeiMpInitLib.inf
-  PlatformHookLib                  | OvmfPkg/LoongArchVirt/Library/Fdt16550SerialPortHookLib/EarlyFdt16550SerialPortHookLib.inf
+  PlatformHookLib                  | MdeModulePkg/Library/BasePlatformHookLibNull/BasePlatformHookLibNull.inf
 
 [LibraryClasses.common.DXE_CORE]
   HobLib                           | MdePkg/Library/DxeCoreHobLib/DxeCoreHobLib.inf

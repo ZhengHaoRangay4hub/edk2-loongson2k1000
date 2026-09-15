@@ -1,0 +1,30 @@
+## @file
+#  Serial I/O for the Loongson 2K1000LA on-chip UART0 (fixed MMIO, no device tree).
+#
+#  Replaces the OvmfPkg FDT based 16550 libraries, which cannot find the UART
+#  before BDS publishes the platform device tree and therefore left the
+#  firmware silent on the debug port.
+#
+#  Copyright (c) 2026, Loongson2K1000LA EDK2 port contributors.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = Loongson2KSerialPortLib
+  FILE_GUID                      = E50700F4-A4A4-4B09-B5B8-C60FB324BD90
+  MODULE_TYPE                    = BASE
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = SerialPortLib
+
+[Sources]
+  Loongson2KSerialPortLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dec
+
+[LibraryClasses]
+  BaseLib
+  IoLib
