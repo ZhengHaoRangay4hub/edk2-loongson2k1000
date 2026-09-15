@@ -476,8 +476,6 @@
   MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
   MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
   MdeModulePkg/Logo/LogoDxe.inf
-  LvglPkg/Application/UefiDashboard/UefiDashboard.inf
-  LvglPkg/Application/LvglDemoApp/LvglDemoApp.inf
 
   MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
 

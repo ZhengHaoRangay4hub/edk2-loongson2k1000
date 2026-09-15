@@ -16,10 +16,13 @@ import sys
 THEME_LIB = "Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf"
 BOOT_MGR_LIB = "Platform/Loongson/Loongson2K1000Pkg/Library/PlatformBootManagerLib/PlatformBootManagerLib.inf"
 LVGL_LIB = "LvglPkg/Library/LvglLib/LvglLib.inf"
+#
+# Only the setup centre is built into the firmware: the upstream demo
+# applications (UefiDashboard, LvglDemoApp) ship a crude UI and would show
+# up in the boot menu next to the real setup, which is confusing.
+#
 APPS = [
     "LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf",
-    "LvglPkg/Application/UefiDashboard/UefiDashboard.inf",
-    "LvglPkg/Application/LvglDemoApp/LvglDemoApp.inf",
 ]
 BOOT_MENU_APP = "MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf"
 UI_APP = "MdeModulePkg/Application/UiApp/UiApp.inf"

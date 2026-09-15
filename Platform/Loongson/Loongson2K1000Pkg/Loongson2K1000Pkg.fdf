@@ -115,8 +115,6 @@ INF  MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
 INF  MdeModulePkg/Logo/LogoDxe.inf
 INF  Platform/Loongson/Loongson2K1000Pkg/LoongsonDisplayDxe/LoongsonDisplayDxe.inf
 INF  Platform/Loongson/Loongson2K1000Pkg/LoongsonOverclockDxe/LoongsonOverclockDxe.inf
-INF  LvglPkg/Application/UefiDashboard/UefiDashboard.inf
-INF  LvglPkg/Application/LvglDemoApp/LvglDemoApp.inf
 INF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
 INF  LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf
 
