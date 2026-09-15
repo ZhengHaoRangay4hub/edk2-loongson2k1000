@@ -100,6 +100,9 @@ STATIC UINTN       mFocusIdx;
 
 STATIC EFI_BOOT_MANAGER_LOAD_OPTION  *mBootOption[MAX_BOOT_ITEMS];
 STATIC UINTN                          mBootOptionCount;
+
+/* Keypad indev the key callback is attached to. */
+STATIC lv_indev_t  *mKeypadIndev;
 STATIC lv_obj_t  *mOcOptBtn[OC_COUNT];
 STATIC lv_obj_t  *mOcOptLabel[OC_COUNT];
 STATIC lv_obj_t  *mOcNotice;
@@ -583,8 +586,11 @@ ActivateFocused (
 }
 
 /**
-  Key handling: the keypad indev reports LV_EVENT_KEY; arrow keys move the
-  focus, Enter activates the focused entry.
+  Key handling: with no LVGL focus group the keypad indev reports its key
+  presses through LV_EVENT_PRESSED, and the key itself is read back from the
+  indev (the event parameter is NULL for indev-level events).
+
+  Arrow keys move the focus, Enter activates the focused entry.
 **/
 STATIC
 VOID
@@ -594,7 +600,11 @@ KeyHandler (
 {
   UINT32  Key;
 
-  Key = *(UINT32 *)lv_event_get_param (Event);
+  if (mKeypadIndev == NULL) {
+    return;
+  }
+
+  Key = lv_indev_get_key (mKeypadIndev);
 
   switch (Key) {
     case LV_KEY_UP:
@@ -978,7 +988,8 @@ LvglSetupMain (
     }
 
     if (lv_indev_get_type (Indev) == LV_INDEV_TYPE_KEYPAD) {
-      lv_indev_add_event_cb (Indev, KeyHandler, LV_EVENT_KEY, NULL);
+      mKeypadIndev = Indev;
+      lv_indev_add_event_cb (Indev, KeyHandler, LV_EVENT_PRESSED, NULL);
     }
   }
 
