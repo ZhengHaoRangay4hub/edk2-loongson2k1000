@@ -161,6 +161,28 @@ build -b RELEASE -t GCC -a LOONGARCH64 -p Platform/Loongson/Loongson2K1000Pkg/Lo
   的 `FILE_GUID` 冲突、`AsciiSPrint` 中 `%s`/`%a` 的 CHAR16/CHAR8 语义差异
   导致中文串乱码。
 
+## USB3 / 存储 / 闪存布局
+
+- **USB3**：板载 ASM1042（PCIe→USB3）走标准 XHCI 驱动，已编入教育派固件，
+  与 QEMU 回归固件同一实现（QEMU 下已验证）。
+- **存储启动**：USB（EHCI/XHCI + USB 大容量存储）、SATA/AHCI、NVMe。
+- **闪存布局**：固件卷 `0x000000..0x370000`，UEFI 变量区
+  `0x370000..0x400000`，两者不重叠；刷写与恢复步骤见
+  [docs/FLASHING.md](docs/FLASHING.md)。
+
+## PMON 参数对照（设置中心第 5 页）
+
+设置中心内「PMON 参数」页把可调项与固定项列清楚，避免误解：
+
+| 项目 | 状态 |
+|---|---|
+| CPU 频率 | **可调** 800–1200 MHz（启动时写入 CPU PLL，公式与 PMON `ClkSetting.S` 一致） |
+| 启动顺序 | **可调**（BootNext，见「启动设置」页） |
+| CPU 电压 | 固定：板级电源决定，PMON 全树无软件调压代码 |
+| DDR 频率 | 固定 400 MHz（编译期常量；PMON 同为编译期，改动需重新训练内存） |
+| GPU / 显示 / 网口时钟 | 编译期常量（与 PMON `ClkSetting.S` 同源） |
+| 串口速率 | 固定 115200 8N1 |
+
 ## CI：增量编译缓存
 
 GitHub Actions 现在带三层缓存，避免每次从零编译（实测 5–7 分钟 → 约 1.5 分钟）：
