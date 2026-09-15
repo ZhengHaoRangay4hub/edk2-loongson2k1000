@@ -501,6 +501,12 @@ ShowPage (
 
 STATIC
 VOID
+RestyleOcOptions (
+  VOID
+  );
+
+STATIC
+VOID
 OcSelect (
   IN UINTN  Index
   )
