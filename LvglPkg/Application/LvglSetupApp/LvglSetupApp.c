@@ -884,7 +884,7 @@ BuildPageSystem (
 
   Card = MakeCard (Page, "固件");
   AddInfoRow (Card, "固件名称", "Loongson 2K1000LA EDK II");
-  AddInfoRow (Card, "版本", "v0.2.0");
+  AddInfoRow (Card, "版本", "v0.3.1");
   AddInfoRow (Card, "图形界面", "LVGL（LvglPkg）");
   AddInfoRow (Card, "许可协议", "BSD-2-Clause-Patent");
 
