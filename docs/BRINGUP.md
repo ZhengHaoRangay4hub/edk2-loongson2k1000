@@ -189,10 +189,17 @@ SII9022A 收不到像素时钟；I2C1 使能位也可能缺失导致 9022A 初�
 2. `UartPinMuxInit()`：追加 `Value |= 0x3FD10u`（出厂上位使能位，低 4 位保持 0x3）；
 3. `LoongsonDisplayDxe`：GOP 句柄初始化 `Handle = NULL`（原为未初始化栈值）；
 4. `LoongsonDisplayDxe`：帧缓冲改 `AllocateMaxAddress = 0x0EFFFFFF`
-   （对齐 PMON 低窗 0x05000000 的已验证行为）。
+   （对齐 PMON 低窗 0x05000000 的已验证行为）；
+5. `LoongsonDisplayDxe`：GOP Blt 去掉 R/B 互换——PMON `FILL_32BIT_X888RGB`
+   原样存 `0x00RRGGBB`（`VIDEO_FB_LITTLE_ENDIAN` 未定义，`SWAP32` 是恒等），
+   与 GOP 声明的 `PixelBlueGreenRedReserved8BitPerColor` 及 BltPixel 布局一致，
+   原 swap 会让 UEFI 侧绘制内容红蓝颠倒；顺带补上 `EfiBltVideoFill` 缺失的
+   cache flush，并把 `EfiBltBufferToVideo` 的 flush 范围修正为按 stride 跨行
+   （原 `Width*4*Height` 连续区间在部分区域 blt 时漏刷）。
 
 **上机预期**：HDMI 出发光龙 logo 与设置中心。判读：串口有
-`SII9022A not found on I2C1` → 查 `0x1fe00420`；有 `GOP ready` 但黑 → 查 `0x1fe00430`。
+`SII9022A not found on I2C1` → 查 `0x1fe00420`；有 `GOP ready` 但黑 → 查 `0x1fe00430`；
+画面红蓝互换 → 回查 Blt/PMON 像素序。
 
 ---
 

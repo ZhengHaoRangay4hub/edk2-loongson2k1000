@@ -418,6 +418,24 @@ STATIC VOID PaintLogo (VOID)
   WriteBackInvalidateDataCacheRange (mFrameBuffer, MODE_STRIDE * MODE_VR);
 }
 
+/**
+  Flush a written rectangle so the DC DMA sees it. Rows are MODE_STRIDE
+  apart, so the span is (Height-1)*MODE_STRIDE + Width*4, not Width*Height*4.
+**/
+STATIC VOID
+FlushRect (
+  IN UINTN  X,
+  IN UINTN  Y,
+  IN UINTN  Width,
+  IN UINTN  Height
+  )
+{
+  WriteBackInvalidateDataCacheRange (
+    mFrameBuffer + Y * (MODE_STRIDE / 4) + X,
+    (Height - 1) * MODE_STRIDE + Width * 4
+    );
+}
+
 /* ---------------- GOP ---------------- */
 
 STATIC EFI_STATUS EFIAPI
@@ -478,6 +496,16 @@ GopBlt (
     return EFI_INVALID_PARAMETER;
   }
 
+  if ((BltOperation != EfiBltVideoToVideo) && ((Width == 0) || (Height == 0))) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  //
+  // The framebuffer format is PixelBlueGreenRedReserved8BitPerColor, the
+  // same layout as EFI_GRAPHICS_OUTPUT_BLT_PIXEL (and the same X888RGB
+  // order PMON's FILL_32BIT_X888RGB stores) - copy pixels verbatim, no
+  // channel swapping.
+  //
   switch (BltOperation) {
     case EfiBltVideoFill:
       if (Delta != 0) {
@@ -487,10 +515,10 @@ GopBlt (
         UINT32  *Line = mFrameBuffer + (DestinationY + Y) * (MODE_STRIDE / 4) + DestinationX;
         UINTN   X;
         for (X = 0; X < Width; X++) {
-          UINT32  Pix   = *(UINT32 *)BltBuffer;
-          Line[X] = ((Pix >> 16) & 0xff) | (Pix & 0x00ff00) | ((Pix & 0xff) << 16);
+          Line[X] = *(UINT32 *)BltBuffer;
         }
       }
+      FlushRect (DestinationX, DestinationY, Width, Height);
       break;
 
     case EfiBltVideoToBltBuffer:
@@ -500,10 +528,7 @@ GopBlt (
       for (Y = 0; Y < Height; Y++) {
         Src = mFrameBuffer + (SourceY + Y) * (MODE_STRIDE / 4) + SourceX;
         Dst = (UINT32 *)((UINT8 *)BltBuffer + (DestinationY + Y) * Delta) + DestinationX;
-        for (UINTN X = 0; X < Width; X++) {
-          UINT32  Pix = Src[X];
-          Dst[X] = ((Pix >> 16) & 0xff) | (Pix & 0x00ff00) | ((Pix & 0xff) << 16);
-        }
+        CopyMem (Dst, Src, Width * 4);
       }
       break;
 
@@ -514,15 +539,9 @@ GopBlt (
       for (Y = 0; Y < Height; Y++) {
         Src = (UINT32 *)((UINT8 *)BltBuffer + (SourceY + Y) * Delta) + SourceX;
         Dst = mFrameBuffer + (DestinationY + Y) * (MODE_STRIDE / 4) + DestinationX;
-        for (UINTN X = 0; X < Width; X++) {
-          UINT32  Pix = Src[X];
-          Dst[X] = ((Pix >> 16) & 0xff) | (Pix & 0x00ff00) | ((Pix & 0xff) << 16);
-        }
+        CopyMem (Dst, Src, Width * 4);
       }
-      WriteBackInvalidateDataCacheRange (
-        mFrameBuffer + DestinationY * (MODE_STRIDE / 4) + DestinationX,
-        Width * 4 * Height
-        );
+      FlushRect (DestinationX, DestinationY, Width, Height);
       break;
 
     case EfiBltVideoToVideo:
