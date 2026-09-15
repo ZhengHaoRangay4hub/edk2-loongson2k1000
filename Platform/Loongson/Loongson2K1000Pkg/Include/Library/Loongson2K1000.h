@@ -25,12 +25,21 @@
 #define LS2K_UART0_CLOCK        125000000   /* 125 MHz APB clock, all UARTs */
 
 /*
- * The console runs on the LVTTL port so a plain 3.3V USB-TTL adapter reads it,
- * with every byte mirrored to UART0 so the RS232 debug port keeps working.
- * Set LS2K_CONSOLE_MIRROR_BASE to 0 to drop the mirror.
+ * Console fan-out.  The board brings out three LVTTL UARTs plus the RS232
+ * debug port, and there is no reliable public description of which of them is
+ * pin-muxed and clock-gated at reset, so the firmware writes every character
+ * to all four: whichever pair of pins is wired up will show the log, and the
+ * RS232 port keeps working through the existing adapter.
+ *
+ * The primary port is polled properly (its bytes must get out); the mirrors
+ * are written with a bounded wait, because an ungated UART can return a status
+ * register that never reports "ready" and a full poll there would hang the
+ * firmware on the first character.
  */
-#define LS2K_CONSOLE_BASE       LS2K_UART3_BASE
-#define LS2K_CONSOLE_MIRROR_BASE LS2K_UART0_BASE
+#define LS2K_CONSOLE_BASE        LS2K_UART3_BASE   /* primary: LVTTL pins 8/10  */
+#define LS2K_CONSOLE_MIRROR0_BASE LS2K_UART0_BASE  /* RS232  pins 59/60         */
+#define LS2K_CONSOLE_MIRROR1_BASE LS2K_UART4_BASE  /* LVTTL  pins 53/54         */
+#define LS2K_CONSOLE_MIRROR2_BASE LS2K_UART5_BASE  /* LVTTL  pins 55/56         */
 
 #define LS2K_SPI0_BASE          0x1fff0220  /* on-chip SPI master (SPI NOR) */
 

@@ -78,8 +78,13 @@
 // wiring keeps working during bring-up.  Set LS2K_CONSOLE_MIRROR_BASE to 0 in
 // Include/Library/Loongson2K1000.h to drop the mirror.
 //
-#define UART_BASE         ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_BASE))
-#define UART_MIRROR_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_MIRROR_BASE))
+#define UART_BASE          ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_BASE))
+#define UART_MIRROR0_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_MIRROR0_BASE))
+#define UART_MIRROR1_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_MIRROR1_BASE))
+#define UART_MIRROR2_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_MIRROR2_BASE))
+
+/* Polls a mirror is willing to spend before writing anyway. */
+#define UART_MIRROR_GUARD  0x800
 
 /**
   Program the divisor latches for a given baud rate.
@@ -123,6 +128,41 @@ UartSetBaudAt (
 }
 
 /**
+  Take one byte from the first console port that has one.
+
+  @param[out]  Byte  Receives the byte when one was available.
+
+  @return  1 when a byte was returned, 0 when every port was empty.
+**/
+STATIC
+UINTN
+UartGetByte (
+  OUT UINT8  *Byte
+  )
+{
+  UINTN  Ports[4];
+  UINTN  Index;
+
+  Ports[0] = UART_BASE;
+  Ports[1] = UART_MIRROR0_BASE;
+  Ports[2] = UART_MIRROR1_BASE;
+  Ports[3] = UART_MIRROR2_BASE;
+
+  for (Index = 0; Index < 4; Index++) {
+    if (Ports[Index] == 0) {
+      continue;
+    }
+
+    if ((MmioRead8 (Ports[Index] + UART_LSR) & UART_LSR_DATA_READY) != 0) {
+      *Byte = MmioRead8 (Ports[Index] + UART_RBR);
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
+/**
   Initialize the serial device hardware: 115200 8N1, FIFOs on, no interrupts.
 
   @retval RETURN_SUCCESS  The serial device was initialized.
@@ -133,12 +173,18 @@ SerialPortInitialize (
   VOID
   )
 {
+  UINTN  Ports[4];
   UINTN  Port;
 
-  for (Port = 0; Port < 2; Port++) {
+  Ports[0] = UART_BASE;
+  Ports[1] = UART_MIRROR0_BASE;
+  Ports[2] = UART_MIRROR1_BASE;
+  Ports[3] = UART_MIRROR2_BASE;
+
+  for (Port = 0; Port < 4; Port++) {
     UINTN  Base;
 
-    Base = (Port == 0) ? UART_BASE : UART_MIRROR_BASE;
+    Base = Ports[Port];
     if (Base == 0) {
       continue;
     }
@@ -175,7 +221,10 @@ SerialPortWrite (
   IN UINTN  NumberOfBytes
   )
 {
-  UINTN  Index;
+  UINTN   Index;
+  UINTN   Base;
+  UINTN   Mirror;
+  UINTN   Mirrors[3];
 
   if ((Buffer == NULL) || (NumberOfBytes == 0)) {
     return 0;
@@ -188,12 +237,30 @@ SerialPortWrite (
 
     MmioWrite8 (UART_BASE + UART_THR, Buffer[Index]);
 
-    if (UART_MIRROR_BASE != 0) {
-      while ((MmioRead8 (UART_MIRROR_BASE + UART_LSR) & UART_LSR_THR_EMPTY) == 0) {
-        CpuPause ();
+    //
+    // Mirrors: best effort.  A UART whose clock gate is off can report a
+    // status register that never becomes ready, so bound the wait instead of
+    // blocking the whole firmware on it.
+    //
+    Mirrors[0] = UART_MIRROR0_BASE;
+    Mirrors[1] = UART_MIRROR1_BASE;
+    Mirrors[2] = UART_MIRROR2_BASE;
+    for (Mirror = 0; Mirror < 3; Mirror++) {
+      UINT32  Guard;
+
+      Base = Mirrors[Mirror];
+      if (Base == 0) {
+        continue;
       }
 
-      MmioWrite8 (UART_MIRROR_BASE + UART_THR, Buffer[Index]);
+      Guard = UART_MIRROR_GUARD;
+      while ((MmioRead8 (Base + UART_LSR) & UART_LSR_THR_EMPTY) == 0) {
+        if (--Guard == 0) {
+          break;
+        }
+      }
+
+      MmioWrite8 (Base + UART_THR, Buffer[Index]);
     }
   }
 
@@ -221,12 +288,14 @@ SerialPortRead (
     return 0;
   }
 
+  //
+  // Accept input on any of the console ports: the operator may have wired up
+  // whichever pair of pins was convenient.
+  //
   for (Index = 0; Index < NumberOfBytes; Index++) {
-    if ((MmioRead8 (UART_BASE + UART_LSR) & UART_LSR_DATA_READY) == 0) {
+    if (UartGetByte (&Buffer[Index]) == 0) {
       break;
     }
-
-    Buffer[Index] = MmioRead8 (UART_BASE + UART_RBR);
   }
 
   return Index;
@@ -244,7 +313,9 @@ SerialPortPoll (
   VOID
   )
 {
-  return (MmioRead8 (UART_BASE + UART_LSR) & UART_LSR_DATA_READY) != 0;
+  UINT8  Byte;
+
+  return UartGetByte (&Byte) != 0;
 }
 
 /**
@@ -382,9 +453,9 @@ SerialPortSetAttributes (
   }
 
   UartSetBaudAt (UART_BASE, (UINTN)*BaudRate);
-  if (UART_MIRROR_BASE != 0) {
-    UartSetBaudAt (UART_MIRROR_BASE, (UINTN)*BaudRate);
-  }
+  UartSetBaudAt (UART_MIRROR0_BASE, (UINTN)*BaudRate);
+  UartSetBaudAt (UART_MIRROR1_BASE, (UINTN)*BaudRate);
+  UartSetBaudAt (UART_MIRROR2_BASE, (UINTN)*BaudRate);
 
   return RETURN_SUCCESS;
 }

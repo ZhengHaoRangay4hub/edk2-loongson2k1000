@@ -21,10 +21,18 @@
 /* Uncached alias of a physical address (DMW0 configured in Start.S). */
 #define UNCACHED(x)  ((UINTN)(0x9000000000000000ULL | (UINT64)(x)))
 
-/* Console on the LVTTL port (board pins 8/10, GND 9), mirrored to the RS232
-   debug port so both remain usable.  See Include/Library/Loongson2K1000.h. */
-#define UART0        UNCACHED (0x1fe20300)   /* console: LVTTL UART3 */
-#define UART0_MIRROR UNCACHED (0x1fe20000)   /* mirror: RS232 debug port */
+/*
+ * Console fan-out: the board exposes three LVTTL UARTs plus the RS232 debug
+ * port and nothing public says which are pin-muxed at reset, so all four get
+ * every character.  See Include/Library/Loongson2K1000.h.
+ */
+#define UART0        UNCACHED (0x1fe20300)   /* primary: LVTTL, pins 8/10 */
+#define UART0_MIRROR UNCACHED (0x1fe20000)   /* RS232,   pins 59/60 */
+#define UART1_MIRROR UNCACHED (0x1fe20400)   /* LVTTL,   pins 53/54 */
+#define UART2_MIRROR UNCACHED (0x1fe20500)   /* LVTTL,   pins 55/56 */
+
+#define UART_LSR_THR_EMPTY  0x20
+#define UART_MIRROR_GUARD   0x800
 #define SYSCONF(x)  UNCACHED (0x1fe00000 + (x))
 #define GPIO_CFG    UNCACHED (0x1fe00500)
 #define RTC_PWR(x)  UNCACHED (0x1fe27000 + (x))
@@ -50,19 +58,50 @@ EarlySerialInit (
   VOID
   )
 {
-  UINTN  Ports[2];
+  UINTN  Ports[4];
   UINTN  Index;
 
   Ports[0] = UART0;
   Ports[1] = UART0_MIRROR;
+  Ports[2] = UART1_MIRROR;
+  Ports[3] = UART2_MIRROR;
 
-  for (Index = 0; Index < 2; Index++) {
+  for (Index = 0; Index < 4; Index++) {
     MmioWrite8 (Ports[Index] + 3, 0x80);   /* DLAB = 1 */
     MmioWrite8 (Ports[Index] + 1, 0x00);   /* DLM      */
     MmioWrite8 (Ports[Index] + 0, 0x36);   /* DLL = 54 */
     MmioWrite8 (Ports[Index] + 3, 0x03);   /* 8N1      */
     MmioWrite8 (Ports[Index] + 2, 0x47);   /* FIFO     */
   }
+}
+
+/**
+  Write one byte to a UART.  The primary port waits for room as long as it
+  takes; a mirror only waits a bounded number of polls and then writes anyway,
+  because an ungated UART can report "never ready" and block the firmware.
+**/
+STATIC
+VOID
+EarlyPutByte (
+  IN UINTN    Base,
+  IN UINT8    Byte,
+  IN BOOLEAN  Blocking
+  )
+{
+  UINT32  Guard;
+
+  Guard = UART_MIRROR_GUARD;
+  while ((MmioRead8 (Base + 5) & UART_LSR_THR_EMPTY) == 0) {
+    if (Blocking) {
+      continue;
+    }
+
+    if (--Guard == 0) {
+      break;
+    }
+  }
+
+  MmioWrite8 (Base + 0, Byte);
 }
 
 /**
@@ -74,15 +113,10 @@ EarlyPutString (
   )
 {
   while (*String != '\0') {
-    while ((MmioRead8 (UART0 + 5) & 0x20) == 0) {
-    }
-
-    MmioWrite8 (UART0 + 0, (UINT8)*String);
-
-    while ((MmioRead8 (UART0_MIRROR + 5) & 0x20) == 0) {
-    }
-
-    MmioWrite8 (UART0_MIRROR + 0, (UINT8)*String);
+    EarlyPutByte (UART0, (UINT8)*String, TRUE);
+    EarlyPutByte (UART0_MIRROR, (UINT8)*String, FALSE);
+    EarlyPutByte (UART1_MIRROR, (UINT8)*String, FALSE);
+    EarlyPutByte (UART2_MIRROR, (UINT8)*String, FALSE);
     String++;
   }
 }
