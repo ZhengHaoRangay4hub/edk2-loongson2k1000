@@ -161,13 +161,17 @@ ApbBarConfig (
   until firmware asks for it.  uart1/uart2_enable and the sdio/pwm/i2c/...
   enables in the upper bits are left exactly as they are.
 
-  4'b0011 selects "4 wire mode (uart0 + uart3)": uart0 keeps its pins (the
-  RS232 debug port on 59/60) and uart3 gets pins 8/10.  The factory PMON image
-  ORs 0x3fd19 here (uart pin mux plus a batch of other function enables --
-  sdio, pwm0, i2c0, i2c1, nand, sata, i2s, gmac1 ...).  The upper-bit enables
-  matter: without the i2c1 enable the SII9022A HDMI transmitter on I2C1 is
-  unreachable.  We therefore OR the factory value with the low nibble masked
-  out (0x3fd10) and keep the nibble at 0x3 so the uart mux stays as chosen.
+  4'b0011 was assumed to select "4 wire mode (uart0 + uart3)", but on real
+  hardware writing 0x3 killed the RS232 port (59/60): UART0 TX went from
+  mark-idle (-5V on the RS232 side) to stuck-low (+6V), i.e. the nibble does
+  NOT behave as an independent uart enable bitmask -- it re-slices the whole
+  uart0 pin group and can move uart0 off 59/60.  The factory PMON image ORs
+  0x3fd19 (nibble 0x9, uart0 known-good on RS232).
+
+  v8b strategy: leave the nibble exactly at its reset value (uart0 on 59/60,
+  proven) and only OR the upper factory enable bits (0x3fd10) -- those carry
+  the i2c1 enable without which the SII9022A HDMI transmitter is unreachable.
+  uart3-on-8/10 is postponed until the nibble semantics are nailed down.
 **/
 STATIC
 VOID
@@ -178,9 +182,7 @@ UartPinMuxInit (
   UINT32  Value;
 
   Value  = MmioRead32 (SYSCONF (0x420));
-  Value |= 0x3FD10u;         /* factory enable bits, uart nibble excluded */
-  Value &= ~0xFu;
-  Value |= 0x3;              /* uart0 + uart3 */
+  Value |= 0x3FD10u;         /* factory enable bits, uart nibble untouched */
   MmioWrite32 (SYSCONF (0x420), Value);
 }
 
@@ -430,7 +432,7 @@ PreMemInit (
   WatchdogClose ();
 
   EarlySerialInit ();
-  EarlyPutString ("\r\nLoongson2K1000LA EDK2 SEC booting...\r\n");
+  EarlyPutString ("\r\nLoongson2K1000LA EDK2 SEC booting... [v8b]\r\n");
 
   PcieEarlyConf ();
 
