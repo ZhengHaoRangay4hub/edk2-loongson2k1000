@@ -562,6 +562,11 @@ BootSetNext (
     return;
   }
 
+  CHAR8  Name[128];
+
+  Name[0] = '\0';
+  UnicodeStrToAsciiStrS (mBootOption[Index]->Description, Name, sizeof (Name));
+
   Next   = mBootOption[Index]->OptionNumber;
   Status = gRT->SetVariable (
                   L"BootNext",
@@ -575,7 +580,7 @@ BootSetNext (
   if (EFI_ERROR (Status)) {
     AsciiSPrint (Text, sizeof (Text), "设置失败：%r", Status);
   } else {
-    AsciiSPrint (Text, sizeof (Text), "已设为下次启动：%a", mBootOption[Index]->Description);
+    AsciiSPrint (Text, sizeof (Text), "已设为下次启动：%a", Name);
   }
 
   if (mBootNotice != NULL) {
@@ -783,6 +788,17 @@ BuildPageOverclock (
 
   mOcSummary = MakeLabel (Card, "", &lv_font_ls_setup_16, CLR_TEXT);
   UpdateOcSummary ();
+
+  //
+  // What PMON exposes for this SoC, and what the firmware can change.
+  //
+  Card = MakeCard (Page, "PMON 参数对照");
+  AddInfoRow (Card, "CPU 频率", "可调：本页选择，启动时写入 CPU PLL");
+  AddInfoRow (Card, "CPU 电压", "板级电源固定，PMON 无软件调压");
+  AddInfoRow (Card, "DDR 频率", "400 MHz 编译期常量，与 PMON 一致");
+  AddInfoRow (Card, "GPU / 显示 / 网口时钟", "编译期常量，与 PMON 同源");
+  AddInfoRow (Card, "串口 / SPI 速率", "固定（串口 115200 8N1）");
+  AddInfoRow (Card, "PCIe / USB / SATA", "由 UEFI 驱动枚举并初始化");
 }
 
 /* ------------------------------------------------------------------ */
@@ -833,10 +849,17 @@ BuildPageBoot (
   for (Index = 0; Index < mBootOptionCount; Index++) {
     lv_obj_t  *Btn;
     lv_obj_t  *Label;
+    CHAR8     Name[128];
 
     mBootOption[Index] = &Options[Index];
 
-    AsciiSPrint (Text, sizeof (Text), "%u.  %a", Index + 1, Options[Index].Description);
+    //
+    // Load option descriptions are CHAR16; convert before printing them
+    // into the CHAR8 (UTF-8) string LVGL renders.
+    //
+    Name[0] = '\0';
+    UnicodeStrToAsciiStrS (Options[Index].Description, Name, sizeof (Name));
+    AsciiSPrint (Text, sizeof (Text), "%u.  %a", Index + 1, Name);
 
     Btn = lv_button_create (Card);
     lv_obj_set_width (Btn, lv_pct (100));
