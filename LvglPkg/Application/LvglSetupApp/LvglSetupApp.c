@@ -107,7 +107,7 @@ STATIC lv_obj_t  *mOcOptBtn[OC_COUNT];
 STATIC lv_obj_t  *mOcOptLabel[OC_COUNT];
 STATIC lv_obj_t  *mOcNotice;
 STATIC lv_obj_t  *mBootNotice;
-STATIC lv_obj_t  *mOcValueLabel;
+STATIC lv_obj_t  *mOcSummary;
 STATIC UINTN     mActivePage;
 
 STATIC CONST CHAR8  *mNavText[NAV_COUNT] = {
@@ -399,6 +399,22 @@ AddPageItem (
 
 STATIC
 VOID
+UpdateOcSummary (
+  VOID
+  )
+{
+  CHAR8  Text[96];
+
+  if (mOcSummary == NULL) {
+    return;
+  }
+
+  AsciiSPrint (Text, sizeof (Text), "额定主频 1000 MHz，当前选择 %u MHz。", mOcFreq[mOcSel]);
+  lv_label_set_text (mOcSummary, Text);
+}
+
+STATIC
+VOID
 UpdateFocusStyles (
   VOID
   )
@@ -510,6 +526,12 @@ RestyleOcOptions (
 
 STATIC
 VOID
+UpdateOcSummary (
+  VOID
+  );
+
+STATIC
+VOID
 OcSelect (
   IN UINTN  Index
   )
@@ -522,6 +544,7 @@ OcSelect (
   OcSelSave (mOcSel);
   RestyleOcOptions ();
   UpdateStatusBar ();
+  UpdateOcSummary ();
   lv_label_set_text (mOcNotice, "已保存。CPU 主频将在下次启动时生效。");
 }
 
@@ -758,8 +781,8 @@ BuildPageOverclock (
     CLR_MUTED
     );
 
-  AsciiSPrint (Text, sizeof (Text), "额定主频 1000 MHz，当前选择 %u MHz。", mOcFreq[mOcSel]);
-  MakeLabel (Card, Text, &lv_font_ls_setup_16, CLR_TEXT);
+  mOcSummary = MakeLabel (Card, "", &lv_font_ls_setup_16, CLR_TEXT);
+  UpdateOcSummary ();
 }
 
 /* ------------------------------------------------------------------ */

@@ -127,18 +127,48 @@ build -b RELEASE -t GCC -a LOONGARCH64 -p Platform/Loongson/Loongson2K1000Pkg/Lo
 移植新增代码遵循 BSD-2-Clause-Patent（与 edk2 一致）；移植的 PMON 汇编
 遵循其原始 BSD 授权（见文件头）。
 
-## 图形化前端：LVGL（移植自上游 YangGangUEFI/LvglPkg）
+## 图形化 BIOS 设置中心：LVGL（移植自上游 YangGangUEFI/LvglPkg）
 
-集成了上游原版 [YangGangUEFI/LvglPkg](https://github.com/YangGangUEFI/LvglPkg)
-（LVGL 在 UEFI 环境的官方移植包，pin 的 lvgl 提交与本仓库一致）：
+[Sets up] 集成了上游原版 [YangGangUEFI/LvglPkg](https://github.com/YangGangUEFI/LvglPkg)
+（LVGL 在 UEFI 环境的官方移植包），并在其上构建了**全新的图形化固件设置中心**：
 
-- `LvglPkg/Library/LvglLib`：LVGL 库的 UEFI 移植（GOP 显示 + 键盘/鼠标输入 +
-  ESC 退出），已适配 LoongArch64（架构门控 + freestanding 头文件 shim +
-  `-Werror` 修正），随固件构建。
-- `LvglPkg/Application/UefiDashboard`：图形化系统仪表盘（启动项
-  "UEFI Dashboard (LVGL)"，也可从 Shell 运行），展示 CPU/内存/启动项/时间等
-  信息卡片，键盘/鼠标可交互。
-- `LvglPkg/Application/LvglDemoApp`：LVGL 控件演示。
+- **现代前端风格**：深色渐变背景、圆角卡片、金色强调色、侧边栏导航、
+  焦点高亮（非 Demo 的简陋界面）。
+- **全中文界面**：自 Noto Sans SC（SIL OFL）生成专用点阵字体（正文 16px /
+  标题 24px），LVGL 符号图标经内置字体回退，无缺字。
+- **常用设置齐全**（普通电脑 BIOS 都有的项）：
+  - 系统信息：处理器型号/主频/架构、内存容量、固件版本、显示输出
+  - **性能与超频**：800 / 900 / 1000 / 1100 / 1200 MHz 五档 CPU 主频，
+    选择后立即写入 `LoongsonOcCfg` 变量，下次启动由
+    `LoongsonOverclockDxe` 应用到 CPU PLL；含风险提示
+  - 启动设置：列出全部启动项，选中即设为“下次启动”（写 BootNext）
+  - 显示与语言：当前分辨率、自适应策略、主题、界面语言
+  - 关于本机：固件/图形库信息与操作提示
+- **入口**：启动菜单的 `EFI Firmware Setup`（取代原文本 UiApp 首页）；
+  固件同时内置上游 Demo 应用 `UefiDashboard` / `LvglDemoApp`。
 
-上游包本身不包含 HII 表单渲染器（BIOS 设置页仍是本仓库的主题化文本引擎，
-见上文"厂商风格 Setup 主题"）。
+截图：[系统信息](docs/img/lvgl-setup-system.png) ·
+[性能与超频](docs/img/lvgl-setup-overclock.png) ·
+[显示与语言](docs/img/lvgl-setup-display.png)
+
+### 构建与集成说明
+
+- `LvglPkg/LvglLib` 已适配 LoongArch64（架构门控、freestanding 头文件 shim、
+  `-Werror` 抑制），随固件构建。
+- 上游包本身不含 HII 表单渲染器；本仓库的图形化设置界面即上述
+  `LvglSetupApp`（自定义 UI + EFI 变量读写）。
+- 上游两个已知问题已在本仓库修复并注明：`LvglDemoApp` 与 `UefiDashboard`
+  的 `FILE_GUID` 冲突、`AsciiSPrint` 中 `%s`/`%a` 的 CHAR16/CHAR8 语义差异
+  导致中文串乱码。
+
+## CI：增量编译缓存
+
+GitHub Actions 现在带三层缓存，避免每次从零编译（实测 5–7 分钟 → 约 1.5 分钟）：
+
+1. `edk2` 源码树 + `Build/` 产物（按 DEBUG/RELEASE 分开），命中后
+   `git fetch` 增量更新；
+2. 龙芯官方 LoongArch64 交叉工具链；
+3. `tools/ci_incremental.py`：用内容哈希比对上次构建，**未改动的文件把
+   mtime 归一化为旧时间**（因此不会被重编），改动/新增的保持新时间（重编），
+   让 make 的时间戳规则与真实变更一致；QEMU 目标的补丁由幂等脚本
+   `tools/patch_qemu_target.py` 完成（内容未变则不落盘，避免触发全量重建）。
