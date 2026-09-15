@@ -25,6 +25,13 @@ APPS = [
     "LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf",
 ]
 BOOT_MENU_APP = "MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf"
+
+# Upstream demos: not built into the firmware any more. They are stripped
+# from cached edk2 trees so a previous patch does not keep them alive.
+DEMO_APPS = [
+    "LvglPkg/Application/UefiDashboard/UefiDashboard.inf",
+    "LvglPkg/Application/LvglDemoApp/LvglDemoApp.inf",
+]
 UI_APP = "MdeModulePkg/Application/UiApp/UiApp.inf"
 BOOT_MENU_GUID_BYTES = "{ 0xdc, 0x5b, 0xc2, 0xee, 0xf2, 0x67, 0x95, 0x4d, 0xb1, 0xd5, 0xf8, 0x1b, 0x20, 0x39, 0xd1, 0x1d }"
 LEGACY_BOOT_MENU_GUID = "{ 0x21, 0xaa, 0x2c, 0x46, 0x14, 0x76, 0x03, 0x45, 0x83, 0x6e, 0x8a, 0xb6, 0xf4, 0x66, 0x23, 0x31 }"
@@ -69,6 +76,13 @@ def ensure_before(text, anchor, lines, scope_from=None):
 
 def ensure_after(text, anchor, lines, scope_from=None):
     return _insert(text, anchor, lines, False, scope_from)
+
+
+def strip_demo_apps(text):
+    for app in DEMO_APPS:
+        for prefix in ('INF  ', '  '):
+            text = text.replace('%s%s\n' % (prefix, app), '')
+    return text
 
 
 def write_if_changed(path, text):
@@ -131,6 +145,7 @@ def patch_dsc(path):
         )
 
     text = text.replace(LEGACY_BOOT_MENU_GUID, BOOT_MENU_GUID_BYTES)
+    text = strip_demo_apps(text)
 
     if write_if_changed(path, text):
         log.append("dsc written")
@@ -142,6 +157,7 @@ def patch_fdf(path):
     text = open(path).read()
     in_lines = ['INF  ' + m for m in [BOOT_MENU_APP] + APPS]
     text = ensure_before(text, 'INF  ' + UI_APP, in_lines)
+    text = strip_demo_apps(text)
     if write_if_changed(path, text):
         log.append("fdf written")
     else:

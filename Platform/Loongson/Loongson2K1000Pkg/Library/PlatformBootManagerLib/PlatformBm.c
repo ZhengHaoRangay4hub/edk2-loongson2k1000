@@ -52,15 +52,6 @@ STATIC CONST EFI_GUID mLvglSetupAppFileGuid = {
   { 0xa2, 0xf1, 0x7d, 0x05, 0xc3, 0xb8, 0x9e, 0x42 }
 };
 
-//
-// UefiDashboard.efi (LvglPkg): registered as a boot option when it is
-// present in a firmware volume.
-//
-STATIC CONST EFI_GUID mUefiDashboardFileGuid = {
-  0x18d17609, 0x0798, 0x4905,
-  { 0x83, 0x92, 0xe0, 0x4b, 0x9e, 0x05, 0x4f, 0x0d }
-};
-
 STATIC
 VOID
 PublishFdtConfigurationTable (
@@ -1230,16 +1221,6 @@ PlatformBootManagerAfterConsole (
     L"EFI Internal Shell",
     LOAD_OPTION_ACTIVE | LOAD_OPTION_CATEGORY_APP,
     ShellEnabled
-    );
-
-  //
-  // Rich graphical dashboard (LVGL) when LvglPkg is built in.
-  //
-  PlatformRegisterFvBootOption (
-    (EFI_GUID *)&mUefiDashboardFileGuid,
-    L"UEFI Dashboard (LVGL)",
-    LOAD_OPTION_ACTIVE | LOAD_OPTION_CATEGORY_APP,
-    TRUE
     );
 
   RemoveStaleFvFileOptions ();
