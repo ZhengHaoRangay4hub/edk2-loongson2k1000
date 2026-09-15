@@ -21,11 +21,21 @@
 #define PHYS_TO_UNCACHED(x)  (UNCACHED_MEMORY_ADDR | (x))
 #define PHYS_TO_CACHED(x)    (CACHED_MEMORY_ADDR | (x))
 
-/* Console UART0 of the Loongson education board (LS2K1000LA). */
-#define LS2K1000_UART0_PHYS  0x1fe20000
-#define COM1_BASE_ADDR       PHYS_TO_UNCACHED(LS2K1000_UART0_PHYS)
-#define COM2_BASE_ADDR       COM1_BASE_ADDR
-#define COM3_BASE_ADDR       COM1_BASE_ADDR
+/*
+ * Console UART of the Loongson education board (LS2K1000LA).
+ *
+ * Primary is the LVTTL port (board pins 8/10, GND on 9) so a 3.3V USB-TTL
+ * adapter can read the firmware directly; every character is mirrored to the
+ * RS232 debug port on UART0 so existing wiring keeps working.  Keep the
+ * COM1_BASE_ADDR name: the PMON derived assembly helpers all use it.
+ */
+#define LS2K1000_UART0_PHYS   0x1fe20000   /* RS232 debug port, pins 59/60 */
+#define LS2K1000_UART3_PHYS   0x1fe20300   /* LVTTL, pins 8=TX 10=RX 9=GND */
+#define LS2K1000_CONSOLE_PHYS LS2K1000_UART3_PHYS
+#define COM1_BASE_ADDR        PHYS_TO_UNCACHED(LS2K1000_CONSOLE_PHYS)
+#define COM1_MIRROR_ADDR      PHYS_TO_UNCACHED(LS2K1000_UART0_PHYS)
+#define COM2_BASE_ADDR        COM1_BASE_ADDR
+#define COM3_BASE_ADDR        COM1_BASE_ADDR
 
 /* I2C0 controller (used by the DDR power / SPD helpers). */
 #define LS2K1000_I2C0_REG_BASE    PHYS_TO_UNCACHED(0x1fe21000)

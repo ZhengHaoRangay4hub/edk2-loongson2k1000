@@ -18,8 +18,19 @@
 #define LS_MMIO_UNCACHED(Base)  (0x9000000000000000ULL | (UINT64)(Base))
 
 /* APB / low-speed peripherals on the 2K1000LA internal bus */
-#define LS2K_UART0_BASE         0x1fe20000  /* 16550, console (matches uart0 in DTS) */
-#define LS2K_UART0_CLOCK        125000000   /* 125 MHz APB clock */
+#define LS2K_UART0_BASE         0x1fe20000  /* 16550, RS232 debug port (board pins 59/60) */
+#define LS2K_UART3_BASE         0x1fe20300  /* 16550, LVTTL (board pins 8=TX 10=RX 9=GND) */
+#define LS2K_UART4_BASE         0x1fe20400  /* 16550, LVTTL (board pins 53/54) */
+#define LS2K_UART5_BASE         0x1fe20500  /* 16550, LVTTL (board pins 55/56) */
+#define LS2K_UART0_CLOCK        125000000   /* 125 MHz APB clock, all UARTs */
+
+/*
+ * The console runs on the LVTTL port so a plain 3.3V USB-TTL adapter reads it,
+ * with every byte mirrored to UART0 so the RS232 debug port keeps working.
+ * Set LS2K_CONSOLE_MIRROR_BASE to 0 to drop the mirror.
+ */
+#define LS2K_CONSOLE_BASE       LS2K_UART3_BASE
+#define LS2K_CONSOLE_MIRROR_BASE LS2K_UART0_BASE
 
 #define LS2K_SPI0_BASE          0x1fff0220  /* on-chip SPI master (SPI NOR) */
 

@@ -73,7 +73,13 @@
 // reach it.  Keep this a compile time constant: SerialPortLib is used from SEC
 // onwards, before there is any HOB or handle to look an address up with.
 //
-#define UART_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_UART0_BASE))
+// The console is the LVTTL port so a plain 3.3V USB-TTL adapter can read it;
+// every byte is mirrored to the RS232 debug port (UART0) as well, so the old
+// wiring keeps working during bring-up.  Set LS2K_CONSOLE_MIRROR_BASE to 0 in
+// Include/Library/Loongson2K1000.h to drop the mirror.
+//
+#define UART_BASE         ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_BASE))
+#define UART_MIRROR_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_MIRROR_BASE))
 
 /**
   Program the divisor latches for a given baud rate.
@@ -84,7 +90,8 @@
 **/
 STATIC
 UINT16
-UartSetBaud (
+UartSetBaudAt (
+  IN UINTN  Base,
   IN UINTN  BaudRate
   )
 {
@@ -107,10 +114,10 @@ UartSetBaud (
 
   Written = (UINT16)Divisor;
 
-  MmioWrite8 (UART_BASE + UART_LCR, UART_LCR_DLAB);
-  MmioWrite8 (UART_BASE + UART_DLL, (UINT8)(Written & 0xFF));
-  MmioWrite8 (UART_BASE + UART_DLM, (UINT8)(Written >> 8));
-  MmioWrite8 (UART_BASE + UART_LCR, UART_LCR_8N1);
+  MmioWrite8 (Base + UART_LCR, UART_LCR_DLAB);
+  MmioWrite8 (Base + UART_DLL, (UINT8)(Written & 0xFF));
+  MmioWrite8 (Base + UART_DLM, (UINT8)(Written >> 8));
+  MmioWrite8 (Base + UART_LCR, UART_LCR_8N1);
 
   return Written;
 }
@@ -126,17 +133,28 @@ SerialPortInitialize (
   VOID
   )
 {
-  MmioWrite8 (UART_BASE + UART_IER, 0x00);
-  UartSetBaud (UART_DEFAULT_BAUD);
-  MmioWrite8 (UART_BASE + UART_FCR, UART_FIFO_ENABLE);
-  MmioWrite8 (UART_BASE + UART_MCR, UART_MCR_DTR | UART_MCR_RTS);
+  UINTN  Port;
 
-  //
-  // Drop whatever the previous phase or a reset left in the receive FIFO.
-  //
-  (VOID)MmioRead8 (UART_BASE + UART_RBR);
-  (VOID)MmioRead8 (UART_BASE + UART_LSR);
-  (VOID)MmioRead8 (UART_BASE + UART_SCR);
+  for (Port = 0; Port < 2; Port++) {
+    UINTN  Base;
+
+    Base = (Port == 0) ? UART_BASE : UART_MIRROR_BASE;
+    if (Base == 0) {
+      continue;
+    }
+
+    MmioWrite8 (Base + UART_IER, 0x00);
+    UartSetBaudAt (Base, UART_DEFAULT_BAUD);
+    MmioWrite8 (Base + UART_FCR, UART_FIFO_ENABLE);
+    MmioWrite8 (Base + UART_MCR, UART_MCR_DTR | UART_MCR_RTS);
+
+    //
+    // Drop whatever the previous phase or a reset left in the receive FIFO.
+    //
+    (VOID)MmioRead8 (Base + UART_RBR);
+    (VOID)MmioRead8 (Base + UART_LSR);
+    (VOID)MmioRead8 (Base + UART_SCR);
+  }
 
   return RETURN_SUCCESS;
 }
@@ -169,6 +187,14 @@ SerialPortWrite (
     }
 
     MmioWrite8 (UART_BASE + UART_THR, Buffer[Index]);
+
+    if (UART_MIRROR_BASE != 0) {
+      while ((MmioRead8 (UART_MIRROR_BASE + UART_LSR) & UART_LSR_THR_EMPTY) == 0) {
+        CpuPause ();
+      }
+
+      MmioWrite8 (UART_MIRROR_BASE + UART_THR, Buffer[Index]);
+    }
   }
 
   return NumberOfBytes;
@@ -355,7 +381,10 @@ SerialPortSetAttributes (
     return RETURN_INVALID_PARAMETER;
   }
 
-  UartSetBaud ((UINTN)*BaudRate);
+  UartSetBaudAt (UART_BASE, (UINTN)*BaudRate);
+  if (UART_MIRROR_BASE != 0) {
+    UartSetBaudAt (UART_MIRROR_BASE, (UINTN)*BaudRate);
+  }
 
   return RETURN_SUCCESS;
 }

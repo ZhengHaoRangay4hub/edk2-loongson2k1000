@@ -23,10 +23,16 @@
 
 	aliases {
 		serial0 = &uart0;
+		serial1 = &uart3;
 	};
 
+	/*
+	 * Console is the LVTTL port (pins 8/10) so a plain 3.3V USB-TTL adapter
+	 * reads both the firmware log and the OS console; uart0 (RS232, pins
+	 * 59/60) carries a mirror of the firmware output.
+	 */
 	chosen {
-		stdout-path = "serial0:115200n8";
+		stdout-path = "serial1:115200n8";
 	};
 
 	/* 2GB DDR3: low window + high window, 2MB firmware reserve at 0. */
@@ -51,6 +57,10 @@
 };
 
 &uart0 {
+	status = "okay";
+};
+
+&uart3 {
 	status = "okay";
 };
 

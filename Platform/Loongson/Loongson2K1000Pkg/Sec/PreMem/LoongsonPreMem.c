@@ -21,7 +21,10 @@
 /* Uncached alias of a physical address (DMW0 configured in Start.S). */
 #define UNCACHED(x)  ((UINTN)(0x9000000000000000ULL | (UINT64)(x)))
 
-#define UART0       UNCACHED (0x1fe20000)
+/* Console on the LVTTL port (board pins 8/10, GND 9), mirrored to the RS232
+   debug port so both remain usable.  See Include/Library/Loongson2K1000.h. */
+#define UART0        UNCACHED (0x1fe20300)   /* console: LVTTL UART3 */
+#define UART0_MIRROR UNCACHED (0x1fe20000)   /* mirror: RS232 debug port */
 #define SYSCONF(x)  UNCACHED (0x1fe00000 + (x))
 #define GPIO_CFG    UNCACHED (0x1fe00500)
 #define RTC_PWR(x)  UNCACHED (0x1fe27000 + (x))
@@ -47,11 +50,19 @@ EarlySerialInit (
   VOID
   )
 {
-  MmioWrite8 (UART0 + 3, 0x80);   /* DLAB = 1 */
-  MmioWrite8 (UART0 + 1, 0x00);   /* DLL      */
-  MmioWrite8 (UART0 + 0, 0x36);   /* DLM      */
-  MmioWrite8 (UART0 + 3, 0x03);   /* 8N1      */
-  MmioWrite8 (UART0 + 2, 71);     /* FIFO     */
+  UINTN  Ports[2];
+  UINTN  Index;
+
+  Ports[0] = UART0;
+  Ports[1] = UART0_MIRROR;
+
+  for (Index = 0; Index < 2; Index++) {
+    MmioWrite8 (Ports[Index] + 3, 0x80);   /* DLAB = 1 */
+    MmioWrite8 (Ports[Index] + 1, 0x00);   /* DLM      */
+    MmioWrite8 (Ports[Index] + 0, 0x36);   /* DLL = 54 */
+    MmioWrite8 (Ports[Index] + 3, 0x03);   /* 8N1      */
+    MmioWrite8 (Ports[Index] + 2, 0x47);   /* FIFO     */
+  }
 }
 
 /**
@@ -66,7 +77,13 @@ EarlyPutString (
     while ((MmioRead8 (UART0 + 5) & 0x20) == 0) {
     }
 
-    MmioWrite8 (UART0 + 0, (UINT8)*String++);
+    MmioWrite8 (UART0 + 0, (UINT8)*String);
+
+    while ((MmioRead8 (UART0_MIRROR + 5) & 0x20) == 0) {
+    }
+
+    MmioWrite8 (UART0_MIRROR + 0, (UINT8)*String);
+    String++;
   }
 }
 

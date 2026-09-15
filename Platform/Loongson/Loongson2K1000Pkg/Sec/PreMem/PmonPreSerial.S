@@ -57,6 +57,9 @@ ASM_PFX(initserial_later):
 
 #------------------------------------------------------------------------------
 # tgt_putchar - blocking char output (a0 = char)
+#
+# Writes to the console UART and mirrors the byte to the RS232 debug port, so
+# a 3.3V TTL adapter on the LVTTL pins and the old RS232 wiring both work.
 #------------------------------------------------------------------------------
 ASM_GLOBAL ASM_PFX(tgt_putchar)
 ASM_PFX(tgt_putchar):
@@ -65,6 +68,12 @@ ASM_PFX(tgt_putchar):
 	ld.bu	$a2, $a1, 0x5
 	andi	$a2, $a2, 0x20
 	beqz	$a2, 1b
+	st.b	$a0, $a1, 0
+	li.d	$a1, COM1_MIRROR_ADDR
+2:
+	ld.bu	$a2, $a1, 0x5
+	andi	$a2, $a2, 0x20
+	beqz	$a2, 2b
 	st.b	$a0, $a1, 0
 	jirl	$zero, $ra, 0
 
