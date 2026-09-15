@@ -89,9 +89,11 @@ SpiFlashSpeedup (
 {
   UINTN  Spi = UNCACHED (0x1fff0220);
 
-  /* All CS high, then clock divider for the fastest supported boot read. */
+  /* All CS high, then the boot read clock divider.  The factory PMON binary
+     programs 0x27 here (its source default of 0x17 is only used when
+     BOOT_SPI_FREQ is undefined), so match the value the board ships with. */
   MmioWrite8 (Spi + 5, 0xff);
-  MmioWrite8 (Spi + 4, 0x17);
+  MmioWrite8 (Spi + 4, 0x27);
 }
 
 STATIC
@@ -335,12 +337,18 @@ PreMemInit (
   VOID
   )
 {
+  /* Order matters, and it is the factory PMON's order: the UART sits behind
+     the APB window that ApbBarConfig() opens, so initialising or printing
+     before that writes into an unrouted address and the output is lost.  The
+     SPI controller is reachable without the BAR (PMON pokes it first), which
+     is why the speedup can come before the BAR. */
+  SpiFlashSpeedup ();
+  ApbBarConfig ();
+  WatchdogClose ();
+
   EarlySerialInit ();
   EarlyPutString ("\r\nLoongson2K1000LA EDK2 SEC booting...\r\n");
 
-  WatchdogClose ();
-  SpiFlashSpeedup ();
-  ApbBarConfig ();
   PcieEarlyConf ();
 
   EarlyPutString ("SoC early init done\r\n");
