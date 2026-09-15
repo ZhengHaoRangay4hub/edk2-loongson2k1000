@@ -197,6 +197,6 @@ GitHub Actions 现在带三层缓存，避免每次从零编译（实测 5–7 �
 
 ## 真机调试记录
 
-从「QEMU 能跑」到「教育派真机」的完整过程——每一版的现象、定位、修改与结论——
-见 [docs/BRINGUP.md](docs/BRINGUP.md)。
-诊断工具（NOR 低窗口阶梯探针生成器）在 [tools/make_nor_probe.py](tools/make_nor_probe.py)。
+- **[docs/STATUS.md](docs/STATUS.md)** —— 按问题组织：每个故障的根因、修复与速查表（串口/引脚复用/供电/启动窗口）。
+- **[docs/BRINGUP.md](docs/BRINGUP.md)** —— 按时间线：每一版的现象、定位、修改与结论，含全部镜像 MD5。
+- 诊断工具（NOR 低窗口阶梯探针生成器）在 [tools/make_nor_probe.py](tools/make_nor_probe.py)。
