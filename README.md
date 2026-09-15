@@ -194,3 +194,9 @@ GitHub Actions 现在带三层缓存，避免每次从零编译（实测 5–7 �
    mtime 归一化为旧时间**（因此不会被重编），改动/新增的保持新时间（重编），
    让 make 的时间戳规则与真实变更一致；QEMU 目标的补丁由幂等脚本
    `tools/patch_qemu_target.py` 完成（内容未变则不落盘，避免触发全量重建）。
+
+## 真机调试记录
+
+从「QEMU 能跑」到「教育派真机」的完整过程——每一版的现象、定位、修改与结论——
+见 [docs/BRINGUP.md](docs/BRINGUP.md)。
+诊断工具（NOR 低窗口阶梯探针生成器）在 [tools/make_nor_probe.py](tools/make_nor_probe.py)。
