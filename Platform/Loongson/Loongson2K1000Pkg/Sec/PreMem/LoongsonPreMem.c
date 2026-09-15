@@ -26,10 +26,8 @@
  * port and nothing public says which are pin-muxed at reset, so all four get
  * every character.  See Include/Library/Loongson2K1000.h.
  */
-#define UART0        UNCACHED (0x1fe20300)   /* primary: LVTTL, pins 8/10 */
-#define UART0_MIRROR UNCACHED (0x1fe20000)   /* RS232,   pins 59/60 */
-#define UART1_MIRROR UNCACHED (0x1fe20400)   /* LVTTL,   pins 53/54 */
-#define UART2_MIRROR UNCACHED (0x1fe20500)   /* LVTTL,   pins 55/56 */
+#define UART0        UNCACHED (0x1fe20000)   /* console: RS232, pins 59/60 */
+#define UART0_MIRROR UNCACHED (0x1fe20300)   /* mirror:  LVTTL, pins 8/10 */
 
 #define UART_LSR_THR_EMPTY  0x20
 #define UART_MIRROR_GUARD   0x800
@@ -58,15 +56,13 @@ EarlySerialInit (
   VOID
   )
 {
-  UINTN  Ports[4];
+  UINTN  Ports[2];
   UINTN  Index;
 
   Ports[0] = UART0;
   Ports[1] = UART0_MIRROR;
-  Ports[2] = UART1_MIRROR;
-  Ports[3] = UART2_MIRROR;
 
-  for (Index = 0; Index < 4; Index++) {
+  for (Index = 0; Index < 2; Index++) {
     MmioWrite8 (Ports[Index] + 3, 0x80);   /* DLAB = 1 */
     MmioWrite8 (Ports[Index] + 1, 0x00);   /* DLM      */
     MmioWrite8 (Ports[Index] + 0, 0x36);   /* DLL = 54 */
@@ -115,8 +111,6 @@ EarlyPutString (
   while (*String != '\0') {
     EarlyPutByte (UART0, (UINT8)*String, TRUE);
     EarlyPutByte (UART0_MIRROR, (UINT8)*String, FALSE);
-    EarlyPutByte (UART1_MIRROR, (UINT8)*String, FALSE);
-    EarlyPutByte (UART2_MIRROR, (UINT8)*String, FALSE);
     String++;
   }
 }

@@ -87,27 +87,6 @@ ASM_PFX(tgt_putchar):
 3:
 	st.b	$a0, $a1, 0
 
-	li.d	$a1, COM1_MIRROR1_ADDR
-	li.w	$a3, 0x800
-4:
-	ld.bu	$a2, $a1, 0x5
-	andi	$a2, $a2, 0x20
-	bnez	$a2, 5f
-	addi.w	$a3, $a3, -1
-	bnez	$a3, 4b
-5:
-	st.b	$a0, $a1, 0
-
-	li.d	$a1, COM1_MIRROR2_ADDR
-	li.w	$a3, 0x800
-6:
-	ld.bu	$a2, $a1, 0x5
-	andi	$a2, $a2, 0x20
-	bnez	$a2, 7f
-	addi.w	$a3, $a3, -1
-	bnez	$a3, 6b
-7:
-	st.b	$a0, $a1, 0
 	jirl	$zero, $ra, 0
 
 #------------------------------------------------------------------------------

@@ -36,10 +36,17 @@
  * register that never reports "ready" and a full poll there would hang the
  * firmware on the first character.
  */
-#define LS2K_CONSOLE_BASE        LS2K_UART3_BASE   /* primary: LVTTL pins 8/10  */
-#define LS2K_CONSOLE_MIRROR0_BASE LS2K_UART0_BASE  /* RS232  pins 59/60         */
-#define LS2K_CONSOLE_MIRROR1_BASE LS2K_UART4_BASE  /* LVTTL  pins 53/54         */
-#define LS2K_CONSOLE_MIRROR2_BASE LS2K_UART5_BASE  /* LVTTL  pins 55/56         */
+/*
+ * Only UART0 and UART3 are live in the reset configuration: the pin mux
+ * register at 0x1fe00420 defaults uart0_enable = 0x1 (4 wire mode), which the
+ * datasheet documents as "uart0 + uart3".  UART4/UART5 exist only in the 4x2
+ * mode, so poking 0x1fe20400/0x1fe20500 on this board touches UARTs that are
+ * not clocked -- observed to disturb the boot, and pointless.
+ */
+#define LS2K_CONSOLE_BASE        LS2K_UART0_BASE   /* RS232, pins 59/60 (PMON's port) */
+#define LS2K_CONSOLE_MIRROR0_BASE LS2K_UART3_BASE  /* LVTTL, pins 8/10, GND 9         */
+#define LS2K_CONSOLE_MIRROR1_BASE 0                /* UART4 needs a mux change: none  */
+#define LS2K_CONSOLE_MIRROR2_BASE 0                /* UART5 needs a mux change: none  */
 
 #define LS2K_SPI0_BASE          0x1fff0220  /* on-chip SPI master (SPI NOR) */
 

@@ -51,7 +51,22 @@ ASM_PFX(_ModuleEntryPoint):
 	csrwr	$t0, CSR_DMW0
 	li.d	$t0, DMW1_CACHED
 	csrwr	$t0, CSR_DMW1
-	li.w	$t0, 0xb0		/* DATF=cached, DATM=cached, DA=1 */
+	/*
+	 * CRMD = 0xb8: DATF/DATM cached, PG=1, and **DA=1** (direct address).
+	 *
+	 * DA has priority over PG, so every access in the SEC phase is a direct
+	 * physical access: no TLB entry is consulted.  That matters on real
+	 * hardware, where the boot ROM only leaves the first 256 KB of the NOR
+	 * window mapped (it copies that much into the on-chip SRAM), while this
+	 * firmware reads its firmware volume up to 3.4 MB, writes the device tree
+	 * to low DRAM and moves its stack to DRAM.  With paging on and no page
+	 * tables of our own, the first such access raised a TLB exception and the
+	 * board reset in a loop.  Upstream's value (0xb0) works on QEMU only
+	 * because QEMU's firmware loader maps everything.
+	 *
+	 * Later phases install their own page tables as usual.
+	 */
+	li.w	$t0, 0xb8
 	csrwr	$t0, CSR_CRMD
 
 	/* Read physical cpu number id */

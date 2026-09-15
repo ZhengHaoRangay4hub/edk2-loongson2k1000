@@ -80,8 +80,6 @@
 //
 #define UART_BASE          ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_BASE))
 #define UART_MIRROR0_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_MIRROR0_BASE))
-#define UART_MIRROR1_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_MIRROR1_BASE))
-#define UART_MIRROR2_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_MIRROR2_BASE))
 
 /* Polls a mirror is willing to spend before writing anyway. */
 #define UART_MIRROR_GUARD  0x800
@@ -140,15 +138,13 @@ UartGetByte (
   OUT UINT8  *Byte
   )
 {
-  UINTN  Ports[4];
+  UINTN  Ports[2];
   UINTN  Index;
 
   Ports[0] = UART_BASE;
   Ports[1] = UART_MIRROR0_BASE;
-  Ports[2] = UART_MIRROR1_BASE;
-  Ports[3] = UART_MIRROR2_BASE;
 
-  for (Index = 0; Index < 4; Index++) {
+  for (Index = 0; Index < 2; Index++) {
     if (Ports[Index] == 0) {
       continue;
     }
@@ -173,15 +169,13 @@ SerialPortInitialize (
   VOID
   )
 {
-  UINTN  Ports[4];
+  UINTN  Ports[2];
   UINTN  Port;
 
   Ports[0] = UART_BASE;
   Ports[1] = UART_MIRROR0_BASE;
-  Ports[2] = UART_MIRROR1_BASE;
-  Ports[3] = UART_MIRROR2_BASE;
 
-  for (Port = 0; Port < 4; Port++) {
+  for (Port = 0; Port < 2; Port++) {
     UINTN  Base;
 
     Base = Ports[Port];
@@ -224,7 +218,7 @@ SerialPortWrite (
   UINTN   Index;
   UINTN   Base;
   UINTN   Mirror;
-  UINTN   Mirrors[3];
+  UINTN   Mirrors[1];
 
   if ((Buffer == NULL) || (NumberOfBytes == 0)) {
     return 0;
@@ -243,9 +237,7 @@ SerialPortWrite (
     // blocking the whole firmware on it.
     //
     Mirrors[0] = UART_MIRROR0_BASE;
-    Mirrors[1] = UART_MIRROR1_BASE;
-    Mirrors[2] = UART_MIRROR2_BASE;
-    for (Mirror = 0; Mirror < 3; Mirror++) {
+    for (Mirror = 0; Mirror < 1; Mirror++) {
       UINT32  Guard;
 
       Base = Mirrors[Mirror];
@@ -454,8 +446,6 @@ SerialPortSetAttributes (
 
   UartSetBaudAt (UART_BASE, (UINTN)*BaudRate);
   UartSetBaudAt (UART_MIRROR0_BASE, (UINTN)*BaudRate);
-  UartSetBaudAt (UART_MIRROR1_BASE, (UINTN)*BaudRate);
-  UartSetBaudAt (UART_MIRROR2_BASE, (UINTN)*BaudRate);
 
   return RETURN_SUCCESS;
 }
