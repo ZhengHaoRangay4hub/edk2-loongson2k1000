@@ -66,7 +66,7 @@ STATIC UINT8  mOcSel;
 /* ------------------------------------------------------------------ */
 /* UI state                                                            */
 /* ------------------------------------------------------------------ */
-#define NAV_COUNT  5
+#define NAV_COUNT  6
 
 STATIC lv_obj_t  *mNavBtn[NAV_COUNT];
 STATIC lv_obj_t  *mNavLabel[NAV_COUNT];
@@ -115,6 +115,7 @@ STATIC CONST CHAR8  *mNavText[NAV_COUNT] = {
   "性能与超频",
   "启动设置",
   "显示与语言",
+  "PMON 参数",
   "关于本机",
 };
 
@@ -789,16 +790,7 @@ BuildPageOverclock (
   mOcSummary = MakeLabel (Card, "", &lv_font_ls_setup_16, CLR_TEXT);
   UpdateOcSummary ();
 
-  //
-  // What PMON exposes for this SoC, and what the firmware can change.
-  //
-  Card = MakeCard (Page, "PMON 参数对照");
-  AddInfoRow (Card, "CPU 频率", "可调：本页选择，启动时写入 CPU PLL");
-  AddInfoRow (Card, "CPU 电压", "板级电源固定，PMON 无软件调压");
-  AddInfoRow (Card, "DDR 频率", "400 MHz 编译期常量，与 PMON 一致");
-  AddInfoRow (Card, "GPU / 显示 / 网口时钟", "编译期常量，与 PMON 同源");
-  AddInfoRow (Card, "串口 / SPI 速率", "固定（串口 115200 8N1）");
-  AddInfoRow (Card, "PCIe / USB / SATA", "由 UEFI 驱动枚举并初始化");
+
 }
 
 /* ------------------------------------------------------------------ */
@@ -938,6 +930,45 @@ BuildPageDisplay (
   MakeLabel (
     Card,
     "本设置界面为简体中文；传统设置页可在首页切换语言。",
+    &lv_font_ls_setup_16,
+    CLR_MUTED
+    );
+}
+
+/**
+  What PMON exposes for this SoC and what this firmware can change, so the
+  expectations are explicit instead of implied.
+**/
+STATIC
+VOID
+BuildPagePmon (
+  IN lv_obj_t  *Page
+  )
+{
+  lv_obj_t  *Card;
+
+  Card = MakeCard (Page, "可调整项");
+  AddInfoRow (Card, "CPU 频率", "可调：800-1200 MHz，启动时写入 CPU PLL");
+  AddInfoRow (Card, "启动顺序", "可调：见“启动设置”页（BootNext）");
+  AddInfoRow (Card, "界面语言 / 主题", "可调：本设置中心为简体中文");
+
+  Card = MakeCard (Page, "固定项（与 PMON 一致）");
+  AddInfoRow (Card, "CPU 电压", "板级电源固定，PMON 无软件调压");
+  AddInfoRow (Card, "DDR 频率", "400 MHz 编译期常量，PMON 同为编译期");
+  AddInfoRow (Card, "GPU / 显示 / 网口时钟", "编译期常量，与 PMON ClkSetting 同源");
+  AddInfoRow (Card, "串口速率", "115200 8N1 固定");
+  AddInfoRow (Card, "SPI NOR 速率", "启动时提速，不支持运行时调整");
+
+  Card = MakeCard (Page, "说明");
+  MakeLabel (
+    Card,
+    "DDR 频率变更需要重新训练内存，只能在固件编译期选择；",
+    &lv_font_ls_setup_16,
+    CLR_MUTED
+    );
+  MakeLabel (
+    Card,
+    "本固件沿用 PMON 教育派的 DDR 参数与训练流程。",
     &lv_font_ls_setup_16,
     CLR_MUTED
     );
@@ -1128,7 +1159,7 @@ LvglSetupMain (
   lv_obj_set_style_border_width (Content, 0, 0);
   lv_obj_set_style_pad_all (Content, 18, 0);
   lv_obj_set_flex_flow (Content, LV_FLEX_FLOW_COLUMN);
-  lv_obj_remove_flag (Content, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_scroll_dir (Content, LV_DIR_VER);
 
   mPage[0] = BuildPage (Content, "系统信息", "处理器、内存与固件概览");
   BuildPageSystem (mPage[0]);
@@ -1142,8 +1173,11 @@ LvglSetupMain (
   mPage[3] = BuildPage (Content, "显示与语言", "显示输出与界面语言");
   BuildPageDisplay (mPage[3]);
 
-  mPage[4] = BuildPage (Content, "关于本机", "固件信息与操作提示");
-  BuildPageAbout (mPage[4]);
+  mPage[4] = BuildPage (Content, "PMON 参数", "可调整项与固定项对照");
+  BuildPagePmon (mPage[4]);
+
+  mPage[5] = BuildPage (Content, "关于本机", "固件信息与操作提示");
+  BuildPageAbout (mPage[5]);
 
   /* ---- footer ---- */
   Footer = lv_obj_create (Root);
