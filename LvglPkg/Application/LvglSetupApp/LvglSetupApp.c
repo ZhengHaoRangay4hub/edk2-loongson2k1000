@@ -72,12 +72,34 @@ STATIC lv_obj_t  *mNavBtn[NAV_COUNT];
 STATIC lv_obj_t  *mNavLabel[NAV_COUNT];
 STATIC lv_obj_t  *mPage[NAV_COUNT];
 STATIC lv_obj_t  *mStatusLabel;
-STATIC lv_group_t *mGroup;
 
 /* Interactive widgets per page, in navigation order (sidebar first). */
 #define MAX_PAGE_ITEMS  16
+#define MAX_BOOT_ITEMS  16
 STATIC lv_obj_t  *mPageItems[NAV_COUNT][MAX_PAGE_ITEMS];
 STATIC UINTN     mPageItemCount[NAV_COUNT];
+
+/*
+ * Keyboard focus is managed by the application itself instead of the LVGL
+ * focus group: the group only navigates widgets that were added to it, and
+ * the pages here come and go, so a self-managed list is easier to keep in
+ * step. Keys arrive through the keypad indev's LV_EVENT_KEY callback.
+ */
+typedef enum {
+  FOCUS_NAV = 0,
+  FOCUS_OC,
+  FOCUS_BOOT
+} FOCUS_KIND;
+
+#define FOCUS_MAX  (NAV_COUNT + MAX_PAGE_ITEMS)
+STATIC lv_obj_t    *mFocusObj[FOCUS_MAX];
+STATIC FOCUS_KIND  mFocusKind[FOCUS_MAX];
+STATIC UINTN       mFocusArg[FOCUS_MAX];
+STATIC UINTN       mFocusCount;
+STATIC UINTN       mFocusIdx;
+
+STATIC EFI_BOOT_MANAGER_LOAD_OPTION  *mBootOption[MAX_BOOT_ITEMS];
+STATIC UINTN                          mBootOptionCount;
 STATIC lv_obj_t  *mOcOptBtn[OC_COUNT];
 STATIC lv_obj_t  *mOcOptLabel[OC_COUNT];
 STATIC lv_obj_t  *mOcNotice;
@@ -374,6 +396,62 @@ AddPageItem (
 
 STATIC
 VOID
+UpdateFocusStyles (
+  VOID
+  )
+{
+  UINTN  Index;
+
+  for (Index = 0; Index < mFocusCount; Index++) {
+    BOOLEAN  Focused = (Index == mFocusIdx);
+
+    if (mFocusKind[Index] == FOCUS_NAV) {
+      lv_obj_set_style_border_width (mFocusObj[Index], Focused ? 2 : 0, 0);
+      lv_obj_set_style_border_color (mFocusObj[Index], CLR_TEXT, 0);
+    } else {
+      lv_obj_set_style_border_width (mFocusObj[Index], Focused ? 2 : 1, 0);
+      lv_obj_set_style_border_color (
+        mFocusObj[Index],
+        Focused ? CLR_ACCENT : CLR_CARD_EDGE,
+        0
+        );
+    }
+  }
+}
+
+STATIC
+VOID
+RebuildFocusList (
+  VOID
+  )
+{
+  UINTN  Index;
+
+  mFocusCount = 0;
+
+  for (Index = 0; Index < NAV_COUNT; Index++) {
+    mFocusObj[mFocusCount]  = mNavBtn[Index];
+    mFocusKind[mFocusCount] = FOCUS_NAV;
+    mFocusArg[mFocusCount]  = Index;
+    mFocusCount++;
+  }
+
+  for (Index = 0; Index < mPageItemCount[mActivePage]; Index++) {
+    mFocusObj[mFocusCount]  = mPageItems[mActivePage][Index];
+    mFocusKind[mFocusCount] = (FOCUS_KIND)(mActivePage == 1 ? FOCUS_OC : FOCUS_BOOT);
+    mFocusArg[mFocusCount]  = Index;
+    mFocusCount++;
+  }
+
+  if (mFocusIdx >= mFocusCount) {
+    mFocusIdx = 0;
+  }
+
+  UpdateFocusStyles ();
+}
+
+STATIC
+VOID
 RestyleNav (
   IN UINTN  Active
   )
@@ -416,22 +494,127 @@ ShowPage (
 
   RestyleNav (Index);
 
-  //
-  // Keyboard navigation: sidebar first, then the widgets of the active
-  // page (LVGL only navigates objects that are in the indev's group).
-  //
-  if (mGroup != NULL) {
-    lv_group_remove_all_objs (mGroup);
+  mFocusIdx = Index;
+  RebuildFocusList ();
+  UpdateFocusStyles ();
+}
 
-    for (Loop = 0; Loop < NAV_COUNT; Loop++) {
-      lv_group_add_obj (mGroup, mNavBtn[Loop]);
-    }
+STATIC
+VOID
+OcSelect (
+  IN UINTN  Index
+  )
+{
+  if (Index >= OC_COUNT) {
+    return;
+  }
 
-    for (Loop = 0; Loop < mPageItemCount[Index]; Loop++) {
-      lv_group_add_obj (mGroup, mPageItems[Index][Loop]);
-    }
+  mOcSel = (UINT8)Index;
+  OcSelSave (mOcSel);
+  RestyleOcOptions ();
+  UpdateStatusBar ();
+  lv_label_set_text (mOcNotice, "已保存。CPU 主频将在下次启动时生效。");
+}
 
-    lv_group_focus_obj (mNavBtn[Index]);
+STATIC
+VOID
+BootSetNext (
+  IN UINTN  Index
+  )
+{
+  EFI_STATUS  Status;
+  CHAR8       Text[192];
+  UINT16      Next;
+
+  if (Index >= mBootOptionCount) {
+    return;
+  }
+
+  Next   = mBootOption[Index]->OptionNumber;
+  Status = gRT->SetVariable (
+                  L"BootNext",
+                  &gEfiGlobalVariableGuid,
+                  EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS |
+                  EFI_VARIABLE_RUNTIME_ACCESS,
+                  sizeof (Next),
+                  &Next
+                  );
+
+  if (EFI_ERROR (Status)) {
+    AsciiSPrint (Text, sizeof (Text), "设置失败：%r", Status);
+  } else {
+    AsciiSPrint (Text, sizeof (Text), "已设为下次启动：%a", mBootOption[Index]->Description);
+  }
+
+  if (mBootNotice != NULL) {
+    lv_label_set_text (mBootNotice, Text);
+  }
+}
+
+STATIC
+VOID
+ActivateFocused (
+  VOID
+  )
+{
+  if (mFocusCount == 0) {
+    return;
+  }
+
+  switch (mFocusKind[mFocusIdx]) {
+    case FOCUS_NAV:
+      ShowPage (mFocusArg[mFocusIdx]);
+      break;
+
+    case FOCUS_OC:
+      OcSelect (mFocusArg[mFocusIdx]);
+      break;
+
+    case FOCUS_BOOT:
+      BootSetNext (mFocusArg[mFocusIdx]);
+      break;
+  }
+}
+
+/**
+  Key handling: the keypad indev reports LV_EVENT_KEY; arrow keys move the
+  focus, Enter activates the focused entry.
+**/
+STATIC
+VOID
+KeyHandler (
+  IN lv_event_t  *Event
+  )
+{
+  UINT32  Key;
+
+  Key = *(UINT32 *)lv_event_get_param (Event);
+
+  switch (Key) {
+    case LV_KEY_UP:
+    case LV_KEY_LEFT:
+      if (mFocusIdx == 0) {
+        mFocusIdx = mFocusCount - 1;
+      } else {
+        mFocusIdx--;
+      }
+
+      UpdateFocusStyles ();
+      break;
+
+    case LV_KEY_DOWN:
+    case LV_KEY_RIGHT:
+    case LV_KEY_NEXT:
+      mFocusIdx = (mFocusIdx + 1) % mFocusCount;
+      UpdateFocusStyles ();
+      break;
+
+    case LV_KEY_ENTER:
+      ActivateFocused ();
+      break;
+
+    default:
+      break;
   }
 }
 
@@ -503,11 +686,7 @@ OcClickHandler (
 
   for (Index = 0; Index < OC_COUNT; Index++) {
     if (mOcOptBtn[Index] == Target) {
-      mOcSel = (UINT8)Index;
-      OcSelSave (mOcSel);
-      RestyleOcOptions ();
-      UpdateStatusBar ();
-      lv_label_set_text (mOcNotice, "已保存。CPU 主频将在下次启动时生效。");
+      OcSelect (Index);
       return;
     }
   }
@@ -577,34 +756,13 @@ BootOptionClickHandler (
   IN lv_event_t  *Event
   )
 {
-  EFI_BOOT_MANAGER_LOAD_OPTION  *Option;
-  EFI_STATUS                    Status;
-  CHAR8                         Text[160];
-  UINT16                        Next;
+  UINTN  Index;
 
-  Option = (EFI_BOOT_MANAGER_LOAD_OPTION *)lv_event_get_user_data (Event);
-  if (Option == NULL) {
-    return;
-  }
-
-  Next   = Option->OptionNumber;
-  Status = gRT->SetVariable (
-                  L"BootNext",
-                  &gEfiGlobalVariableGuid,
-                  EFI_VARIABLE_NON_VOLATILE | EFI_VARIABLE_BOOTSERVICE_ACCESS |
-                  EFI_VARIABLE_RUNTIME_ACCESS,
-                  sizeof (Next),
-                  &Next
-                  );
-
-  if (EFI_ERROR (Status)) {
-    AsciiSPrint (Text, sizeof (Text), "设置失败：%r", Status);
-  } else {
-    AsciiSPrint (Text, sizeof (Text), "已设为下次启动：%a", Option->Description);
-  }
-
-  if (mBootNotice != NULL) {
-    lv_label_set_text (mBootNotice, Text);
+  for (Index = 0; Index < mBootOptionCount; Index++) {
+    if (mBootOption[Index] == (EFI_BOOT_MANAGER_LOAD_OPTION *)lv_event_get_user_data (Event)) {
+      BootSetNext (Index);
+      return;
+    }
   }
 }
 
@@ -631,9 +789,13 @@ BuildPageBoot (
     return;
   }
 
-  for (Index = 0; Index < Count; Index++) {
+  mBootOptionCount = (Count < MAX_BOOT_ITEMS) ? Count : MAX_BOOT_ITEMS;
+
+  for (Index = 0; Index < mBootOptionCount; Index++) {
     lv_obj_t  *Btn;
     lv_obj_t  *Label;
+
+    mBootOption[Index] = &Options[Index];
 
     AsciiSPrint (Text, sizeof (Text), "%u.  %a", Index + 1, Options[Index].Description);
 
@@ -791,7 +953,6 @@ LvglSetupMain (
   lv_obj_t    *Footer;
   lv_obj_t    *TitleBox;
   lv_obj_t    *Hint;
-  lv_group_t  *Group;
   lv_indev_t  *Indev;
   UINTN       Index;
 
@@ -799,11 +960,10 @@ LvglSetupMain (
   mActivePage = 0;
 
   /* ---------------------------------------------------------------- */
-  /* Keyboard / mouse: reuse the lib-provided input devices           */
+  /* Keyboard / mouse: reuse the lib-provided input devices. Arrow     */
+  /* keys and Enter arrive through the keypad indev's LV_EVENT_KEY     */
+  /* callback and drive the application's own focus list.              */
   /* ---------------------------------------------------------------- */
-  Group = lv_group_create ();
-  lv_group_set_default (Group);
-  mGroup = Group;
   Indev = NULL;
   for ( ; ; ) {
     Indev = lv_indev_get_next (Indev);
@@ -812,7 +972,7 @@ LvglSetupMain (
     }
 
     if (lv_indev_get_type (Indev) == LV_INDEV_TYPE_KEYPAD) {
-      lv_indev_set_group (Indev, Group);
+      lv_indev_add_event_cb (Indev, KeyHandler, LV_EVENT_KEY, NULL);
     }
   }
 
@@ -945,6 +1105,9 @@ LvglSetupMain (
   MakeLabel (Footer, "设置即时保存", &lv_font_ls_setup_16, CLR_ACCENT);
 
   ShowPage (0);
+  mFocusIdx = 0;
+  RebuildFocusList ();
+  UpdateFocusStyles ();
 }
 
 /**
