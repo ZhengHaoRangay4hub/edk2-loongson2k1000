@@ -172,6 +172,30 @@ DTB 增加 `uart3` 节点、`stdout-path` 指向 TTL 口。
 
 ---
 
+## v8 ——HDMI 黑屏根因修复（DVO 引脚输出 + I2C1 使能）
+
+**现象（v7 上机）**：良好供电下正常进 Boot（上电闪一下），HDMI 全程黑屏。
+
+**根因（出厂二进制实锤）**：逆向出厂 PMON 备份，0x15e4 处 `0x1fe00430 |= 0x30012`
+（pcie0/1 + **DVO0/DVO1 引脚输出使能 0x12**），0x1604 处 `0x1fe00420 |= 0x3fd19`
+（含 i2c0/i2c1 使能）。这两处完整写入只存在于 `GmacAndGeneralCfg()`——而该函数
+**从未被调用（死代码）**；`PcieEarlyConf()` 只 OR 了 `0x30000`，DVO 引脚没开，
+SII9022A 收不到像素时钟；I2C1 使能位也可能缺失导致 9022A 初始化失败。
+（逆向注意：capstone 6.0.0 对部分 `lu52i.d` 编码解码失败会静默截断反汇编流，
+关键序列需手工解码核对。）
+
+**修改**：
+1. `PcieEarlyConf()`：`SYSCONF(0x430) |= 0x30000` → `|= 0x30012`；
+2. `UartPinMuxInit()`：追加 `Value |= 0x3FD10u`（出厂上位使能位，低 4 位保持 0x3）；
+3. `LoongsonDisplayDxe`：GOP 句柄初始化 `Handle = NULL`（原为未初始化栈值）；
+4. `LoongsonDisplayDxe`：帧缓冲改 `AllocateMaxAddress = 0x0EFFFFFF`
+   （对齐 PMON 低窗 0x05000000 的已验证行为）。
+
+**上机预期**：HDMI 出发光龙 logo 与设置中心。判读：串口有
+`SII9022A not found on I2C1` → 查 `0x1fe00420`；有 `GOP ready` 但黑 → 查 `0x1fe00430`。
+
+---
+
 ## 镜像版本一览
 
 | 版本 | commit | 整片镜像 MD5 | 要点 | 真机结果 |
@@ -181,6 +205,8 @@ DTB 增加 `uart3` 节点、`stdout-path` 指向 TTL 口。
 | v4 | 921d853 | `04828616...a675` | 控制台切 TTL+镜像 | （并入 v5） |
 | v5 | 0456af1 | `5fd0fe45...54fd` | 四路输出 | **复位循环** |
 | v6 | ca04c90 | `ffdedf63...9423` | DA=1 + 串口收敛 | 待验证 |
+| v7 | c76951b | `3b76cc79...c607` | UART3 引脚复用 | **启动正常**，HDMI 黑 |
+| v8 | （本提交） | 见 CI 产物 | DVO/I2C1 使能 + GOP 修复 | 待验证 |
 
 整片镜像 = 新 `UEFI.fd`（0x0-0x370000）+ 保留变量区（0x370000-0x400000）。
 原厂 PMON 备份：MD5 `d1d3da6bcea4067bb5b67f54e1f3415d`（恢复用，务必保留）。

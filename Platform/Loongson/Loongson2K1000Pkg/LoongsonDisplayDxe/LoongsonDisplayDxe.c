@@ -563,7 +563,7 @@ LoongsonDisplayDxeEntryPoint (
   EFI_STATUS  Status;
   UINT32      Bar0;
   UINTN       Loopc, Frefc, Pstdiv;
-  EFI_HANDLE  Handle;
+  EFI_HANDLE  Handle = NULL;
 
   //
   // DC is PCI device 0:6:0; take its MMIO BAR0 (PMON reads the same BAR).
@@ -585,11 +585,14 @@ LoongsonDisplayDxeEntryPoint (
   ConfigPixPll (LS_MMIO_UNCACHED (LS2K_PIXCLK1_CTRL0), Loopc, Frefc, Pstdiv);
 
   //
-  // 1024x768x4 = 3 MiB scanout buffer.
+  // 1024x768x4 = 3 MiB scanout buffer.  Keep it in the low DRAM window
+  // (0x00200000-0x0F000000) like PMON, which parks its framebuffer at
+  // 0x05000000; the DC DMA path to the high window (0x90000000+) is not
+  // proven on this chip.
   //
-  mFbPhys = EFI_PAGE_MASK + 1;
+  mFbPhys = 0x0EFFFFFF;
   Status  = gBS->AllocatePages (
-                   AllocateAnyPages,
+                   AllocateMaxAddress,
                    EfiBootServicesData,
                    EFI_SIZE_TO_PAGES ((UINTN)MODE_STRIDE * MODE_VR),
                    &mFbPhys

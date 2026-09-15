@@ -163,9 +163,11 @@ ApbBarConfig (
 
   4'b0011 selects "4 wire mode (uart0 + uart3)": uart0 keeps its pins (the
   RS232 debug port on 59/60) and uart3 gets pins 8/10.  The factory PMON image
-  ORs 0x3fd19 here (which enables uart0's and uart5's pins plus a batch of
-  other functions) but never initialises any UART besides uart0, so on a stock
-  board the only serial output remains the RS232 port.
+  ORs 0x3fd19 here (uart pin mux plus a batch of other function enables --
+  sdio, pwm0, i2c0, i2c1, nand, sata, i2s, gmac1 ...).  The upper-bit enables
+  matter: without the i2c1 enable the SII9022A HDMI transmitter on I2C1 is
+  unreachable.  We therefore OR the factory value with the low nibble masked
+  out (0x3fd10) and keep the nibble at 0x3 so the uart mux stays as chosen.
 **/
 STATIC
 VOID
@@ -176,6 +178,7 @@ UartPinMuxInit (
   UINT32  Value;
 
   Value  = MmioRead32 (SYSCONF (0x420));
+  Value |= 0x3FD10u;         /* factory enable bits, uart nibble excluded */
   Value &= ~0xFu;
   Value |= 0x3;              /* uart0 + uart3 */
   MmioWrite32 (SYSCONF (0x420), Value);
@@ -266,8 +269,13 @@ PcieEarlyConf (
   PciePhyWrite (0x4fff1202);
   PciePhyWrite (0x4fff1302);
 
-  /* enable both PCIe controllers */
-  MmioOrBit32 (SYSCONF (0x430), 0x30000);
+  /*
+   * Enable both PCIe controllers plus the DVO0/DVO1 pin output drivers.
+   * The factory PMON image ORs 0x30012 here (disassembly of the backup at
+   * file offset 0x15e4); writing only 0x30000 leaves the DVO pads gated off
+   * and the HDMI transmitter (SII9022A on DVO0) never sees a pixel clock.
+   */
+  MmioOrBit32 (SYSCONF (0x430), 0x30012);
 
   for (Index = 9; Index <= 12; Index++) {
     PciePortConf (Index, 0);
