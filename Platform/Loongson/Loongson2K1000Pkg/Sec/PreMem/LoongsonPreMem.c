@@ -153,6 +153,35 @@ ApbBarConfig (
 }
 
 /**
+  Bring the LVTTL console pins out.
+
+  The chip pin mux (通用配置寄存器 0, 0x1fe00420) resets with uart0_enable =
+  4'b0001 -- "8 wire mode, uart0 only" -- so the UART3 controller that the
+  board wires to header pins 8/10 (TX/RX, GND on 9) is connected to nothing
+  until firmware asks for it.  uart1/uart2_enable and the sdio/pwm/i2c/...
+  enables in the upper bits are left exactly as they are.
+
+  4'b0011 selects "4 wire mode (uart0 + uart3)": uart0 keeps its pins (the
+  RS232 debug port on 59/60) and uart3 gets pins 8/10.  The factory PMON image
+  ORs 0x3fd19 here (which enables uart0's and uart5's pins plus a batch of
+  other functions) but never initialises any UART besides uart0, so on a stock
+  board the only serial output remains the RS232 port.
+**/
+STATIC
+VOID
+UartPinMuxInit (
+  VOID
+  )
+{
+  UINT32  Value;
+
+  Value  = MmioRead32 (SYSCONF (0x420));
+  Value &= ~0xFu;
+  Value |= 0x3;              /* uart0 + uart3 */
+  MmioWrite32 (SYSCONF (0x420), Value);
+}
+
+/**
   PMON ls2k_pcie_phy_write: a0[0:15] = phy register address,
   a0[16:31] = phy data.
 **/
@@ -389,6 +418,7 @@ PreMemInit (
      is why the speedup can come before the BAR. */
   SpiFlashSpeedup ();
   ApbBarConfig ();
+  UartPinMuxInit ();
   WatchdogClose ();
 
   EarlySerialInit ();
