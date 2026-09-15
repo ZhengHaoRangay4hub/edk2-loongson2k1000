@@ -372,7 +372,7 @@ UpdateStatusBar (
   AsciiSPrint (
     Text,
     sizeof (Text),
-    "%u MHz  ·  %s",
+    "%u MHz  ·  %a",
     mOcFreq[mOcSel],
     Res
     );
@@ -681,7 +681,7 @@ RestyleOcOptions (
     AsciiSPrint (
       Text,
       sizeof (Text),
-      "%u MHz%s",
+      "%u MHz%a",
       mOcFreq[Index],
       mOcTag[Index]
       );
