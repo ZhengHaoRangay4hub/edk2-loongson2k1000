@@ -75,15 +75,21 @@ ASM_PFX(tgt_putchar):
 	 * for "transmitter ready" is bounded here -- an ungated UART can return a
 	 * status register that never sets that bit, and a full poll would hang the
 	 * firmware on the very first character.
+	 *
+	 * The countdown lives in $a6, not $a3: hexserial/hexserial64 hold their
+	 * shift register in $a3 across this call, and the PMON originals only
+	 * promise to clobber $a0-$a2 (see "used: a0~a2" above LEAF(tgt_putchar) in
+	 * ls3a5000_7a/loongson/start.S).  Clobbering $a3 turned every hex number
+	 * into the first digit followed by zeros.
 	 */
 	li.d	$a1, COM1_MIRROR0_ADDR
-	li.w	$a3, 0x800
+	li.w	$a6, 0x800
 2:
 	ld.bu	$a2, $a1, 0x5
 	andi	$a2, $a2, 0x20
 	bnez	$a2, 3f
-	addi.w	$a3, $a3, -1
-	bnez	$a3, 2b
+	addi.w	$a6, $a6, -1
+	bnez	$a6, 2b
 3:
 	st.b	$a0, $a1, 0
 
@@ -91,9 +97,17 @@ ASM_PFX(tgt_putchar):
 
 #------------------------------------------------------------------------------
 # stringserial - print NUL terminated string at a0
+#
+# The callers reach these helpers with `bl`, and every one of them calls
+# tgt_putchar - which is itself reached with `bl` and therefore overwrites
+# $ra.  PMON keeps the return address in $a4 across the loop (see LEAF
+# (hexserial) in ls3a5000_7a/loongson/start.S); without that the final
+# `jirl $zero, $ra, 0` jumps back to the instruction after the last `bl`
+# inside the helper instead of returning, and the helper spins forever.
 #------------------------------------------------------------------------------
 ASM_GLOBAL ASM_PFX(stringserial)
 ASM_PFX(stringserial):
+	ori	$a4, $ra, 0
 1:
 	ld.bu	$a2, $a0, 0
 	beqz	$a2, 2f
@@ -101,6 +115,7 @@ ASM_PFX(stringserial):
 	addi.d	$a0, $a0, 1
 	b	1b
 2:
+	ori	$ra, $a4, 0
 	jirl	$zero, $ra, 0
 
 #------------------------------------------------------------------------------
@@ -108,6 +123,7 @@ ASM_PFX(stringserial):
 #------------------------------------------------------------------------------
 ASM_GLOBAL ASM_PFX(hexserial)
 ASM_PFX(hexserial):
+	ori	$a4, $ra, 0
 	ori	$a3, $a0, 0
 	li.d	$a5, 8
 1:
@@ -120,10 +136,12 @@ ASM_PFX(hexserial):
 	bl	tgt_putchar
 	addi.d	$a5, $a5, -1
 	bnez	$a5, 1b
+	ori	$ra, $a4, 0
 	jirl	$zero, $ra, 0
 
 ASM_GLOBAL ASM_PFX(hexserial64)
 ASM_PFX(hexserial64):
+	ori	$a4, $ra, 0
 	ori	$a3, $a0, 0
 	li.d	$a5, 16
 1:
@@ -136,6 +154,7 @@ ASM_PFX(hexserial64):
 	bl	tgt_putchar
 	addi.d	$a5, $a5, -1
 	bnez	$a5, 1b
+	ori	$ra, $a4, 0
 	jirl	$zero, $ra, 0
 
 	.section .rodata

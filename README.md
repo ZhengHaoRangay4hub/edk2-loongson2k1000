@@ -118,9 +118,16 @@ build -b RELEASE -t GCC -a LOONGARCH64 -p Platform/Loongson/Loongson2K1000Pkg/Lo
   → EFI stub 内核 → mount_root → procd → `root@OpenWrt:~#`。
   官方 generic 内核未内置 virtio-blk，但内置 nvme，因此磁盘必须走
   `-device nvme`；实机效果见 [docs/img/openwrt-console.png](docs/img/openwrt-console.png)。
-- **真机**：DDR3 初始化/leveling 序列按 PMON 原样移植且编译通过，
-  但**尚未在实体教育派上点灯验证**——首次上电请按 FLASHING.md 备份并
-  保留串口日志。
+- **QEMU `ls2k` 闭环烟测**：把教育派那份 `UEFI.fd` 直接喂给
+  `qemu-system-loongarch64 -M ls2k`，SEC → PEI → DXE → BDS 全链跑通并落到
+  交互式 `Shell>` —— 上机前先在模拟器里确认固件本身能跑。两个约束：
+  QEMU 只把 NOR 前 1MB 映射成只读窗口（`DxeIpl` 解压的 LZMA 流必须落在里面），
+  且 flash 窗口的写入会被丢弃，所以要用 `-D QEMU_FIT=TRUE` 构建（变量存储改到
+  低 DDR 空洞 `0x0F000000`）。**这条路径不覆盖 DC/SII9022A**，HDMI 通路只能在
+  真机上验证。
+- **真机**：v7 在良好供电下启动正常（上电闪一下、进入 Boot）；HDMI 仍黑屏，
+  根因与修复见 [docs/STATUS.md](docs/STATUS.md) 的 P5。首次上电请按
+  FLASHING.md 备份并保留串口日志。
 
 ## 许可
 

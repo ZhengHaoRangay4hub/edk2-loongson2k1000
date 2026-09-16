@@ -240,7 +240,17 @@ AddFdtHob (
 
   FdtSize  = FdtTotalSize (Base) + PcdGet32 (PcdDeviceTreeAllocationPadding);
   FdtPages = EFI_SIZE_TO_PAGES (FdtSize);
+  DEBUG ((
+    DEBUG_ERROR,
+    "AddFdtHob: base=0x%lx chk=0x%x total=0x%x size=0x%lx pages=0x%lx\n",
+    (UINT64)(UINTN)Base,
+    (UINT32)FdtCheckHeader (Base),
+    (UINT32)FdtTotalSize (Base),
+    (UINT64)FdtSize,
+    (UINT64)FdtPages
+    ));
   NewBase  = AllocatePages (FdtPages);
+  DEBUG ((DEBUG_ERROR, "AddFdtHob: NewBase=0x%lx\n", (UINT64)(UINTN)NewBase));
   ASSERT (NewBase != NULL);
   FdtOpenInto (Base, NewBase, EFI_PAGES_TO_SIZE (FdtPages));
 

@@ -774,7 +774,22 @@ PlatformRegisterOptionsAndKeys (
   Esc.ScanCode    = SCAN_ESC;
   Esc.UnicodeChar = CHAR_NULL;
   Status          = EfiBootManagerGetBootManagerMenu (&BootOption);
-  ASSERT_EFI_ERROR (Status);
+  if (EFI_ERROR (Status)) {
+    //
+    // No Boot Manager Menu application in this firmware build, so there is
+    // nothing for F2/ESC to point at.  BootOption is unset in that case, and
+    // using it anyway would write a bogus key option; asserting would stop BDS
+    // before it ever reaches the boot options.
+    //
+    DEBUG ((
+      DEBUG_WARN,
+      "%a: Boot Manager Menu unavailable, F2/ESC left unmapped: %r\n",
+      __func__,
+      Status
+      ));
+    return;
+  }
+
   Status = EfiBootManagerAddKeyOptionVariable (
              NULL,
              (UINT16)BootOption.OptionNumber,
@@ -1216,10 +1231,18 @@ PlatformBootManagerAfterConsole (
   //
   // Register UEFI Shell
   //
+  // Note the attributes: BDS only auto-boots options whose category is
+  // LOAD_OPTION_CATEGORY_BOOT (BootBootOptions() in BdsDxe skips everything
+  // else), so the upstream LOAD_OPTION_CATEGORY_APP would leave the Shell
+  // unreachable whenever no Boot Manager Menu is present.  Registering it as a
+  // plain boot option appends it to the end of BootOrder, so real OS entries
+  // found by EfiBootManagerRefreshAllBootOption() are still tried first and the
+  // Shell only comes up when nothing else can boot.
+  //
   PlatformRegisterFvBootOption (
     &gUefiShellFileGuid,
     L"EFI Internal Shell",
-    LOAD_OPTION_ACTIVE | LOAD_OPTION_CATEGORY_APP,
+    LOAD_OPTION_ACTIVE,
     ShellEnabled
     );
 

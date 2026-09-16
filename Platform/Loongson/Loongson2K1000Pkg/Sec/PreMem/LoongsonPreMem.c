@@ -14,6 +14,7 @@
 **/
 
 #include <Uefi.h>
+#include <Library/BaseMemoryLib.h>
 #include <Library/IoLib.h>
 #include <Library/PcdLib.h>
 #include "PreMem.h"
@@ -165,13 +166,13 @@ ApbBarConfig (
   hardware writing 0x3 killed the RS232 port (59/60): UART0 TX went from
   mark-idle (-5V on the RS232 side) to stuck-low (+6V), i.e. the nibble does
   NOT behave as an independent uart enable bitmask -- it re-slices the whole
-  uart0 pin group and can move uart0 off 59/60.  The factory PMON image ORs
-  0x3fd19 (nibble 0x9, uart0 known-good on RS232).
+  uart0 pin group and can move uart0 off 59/60.
 
-  v8b strategy: leave the nibble exactly at its reset value (uart0 on 59/60,
-  proven) and only OR the upper factory enable bits (0x3fd10) -- those carry
-  the i2c1 enable without which the SII9022A HDMI transmitter is unreachable.
-  uart3-on-8/10 is postponed until the nibble semantics are nailed down.
+  What the factory PMON image actually writes is 0x3fd19 (disassembly of the
+  backup at file offset 0x1604), i.e. the reset nibble 0x1 plus bit 3 - not
+  the 0x3 that broke RS232.  0x3fd19 is adopted verbatim here: it is the only
+  value proven to keep uart0 alive on the board while bringing out everything
+  else (i2c0/i2c1, sdio, pwm0, nand, sata, i2s, gmac1).
 **/
 STATIC
 VOID
@@ -182,7 +183,7 @@ UartPinMuxInit (
   UINT32  Value;
 
   Value  = MmioRead32 (SYSCONF (0x420));
-  Value |= 0x3FD10u;         /* factory enable bits, uart nibble untouched */
+  Value |= 0x3FD19u;         /* factory value, byte for byte */
   MmioWrite32 (SYSCONF (0x420), Value);
 }
 
@@ -327,9 +328,20 @@ GmacAndGeneralCfg (
   MmioOrBit32 (RTC_PWR (0x0c), 0x100);
 }
 
+/* FILE GUID of the FREEFORM file that carries the DTB; it must stay in sync
+   with the FILE statement in Loongson2K1000Pkg.fdf. */
+STATIC CONST EFI_GUID  mDtbFileGuid = {
+  0xe1f5c2a9, 0x8b3d, 0x4c6e, { 0x9f, 0x70, 0x1a, 0x2b, 0x3c, 0x4d, 0x5e, 0x6f }
+};
+
 /**
-  Locate the DTB (RAW section inside a FREEFORM FFS file) in the firmware
+  Locate the DTB (RAW section of the file named mDtbFileGuid) in the firmware
   volume and copy it to the well-known RAM address. Runs after DRAM init.
+
+  Matching on the file GUID is what makes this reliable: FVMAIN_COMPACT holds
+  more than one FREEFORM file with a RAW section - the PEI APRIORI list is the
+  first of them - so "first FREEFORM + RAW" copies the APRIORI GUID array and
+  the device tree library then reads it as an FDT header.
 **/
 UINTN
 CopyDtbFromFv (
@@ -337,16 +349,17 @@ CopyDtbFromFv (
   IN EFI_PHYSICAL_ADDRESS  Destination
   )
 {
-  EFI_FIRMWARE_VOLUME_HEADER  *Fv;
-  EFI_FFS_FILE_HEADER         *File;
-  EFI_COMMON_SECTION_HEADER   *Section;
-  UINT8                       *Src;
-  UINT8                       *Dst;
-  UINTN                       Offset;
-  UINTN                       FileSize;
-  UINTN                       SectionSize;
-  UINTN                       FvLength;
-  UINTN                       CopySize;
+  EFI_FIRMWARE_VOLUME_HEADER      *Fv;
+  EFI_FIRMWARE_VOLUME_EXT_HEADER  *ExtHeader;
+  EFI_FFS_FILE_HEADER             *File;
+  EFI_COMMON_SECTION_HEADER       *Section;
+  UINT8                           *Src;
+  UINT8                           *Dst;
+  UINTN                           Offset;
+  UINTN                           FileSize;
+  UINTN                           SectionSize;
+  UINTN                           FvLength;
+  UINTN                           CopySize;
 
   Fv       = (EFI_FIRMWARE_VOLUME_HEADER *)(UINTN)FvBase;
   FvLength = Fv->FvLength;
@@ -355,7 +368,17 @@ CopyDtbFromFv (
     return 0;
   }
 
-  Offset = Fv->HeaderLength;
+  /* The FFS chain starts behind the volume extension header, which is written
+     past HeaderLength (GenFv pads the gap with a FFS pad file).  Follow the
+     same rule the FV driver uses so the walk never starts inside header
+     bytes. */
+  if (Fv->ExtHeaderOffset != 0) {
+    ExtHeader = (EFI_FIRMWARE_VOLUME_EXT_HEADER *)((UINT8 *)(UINTN)FvBase + Fv->ExtHeaderOffset);
+    Offset    = Fv->ExtHeaderOffset + ExtHeader->ExtHeaderSize;
+  } else {
+    Offset = Fv->HeaderLength;
+  }
+
   while (Offset + sizeof (EFI_FFS_FILE_HEADER) < FvLength) {
     Offset   = (Offset + 7) & ~(UINTN)7;
     File     = (EFI_FFS_FILE_HEADER *)((UINT8 *)(UINTN)FvBase + Offset);
@@ -364,7 +387,9 @@ CopyDtbFromFv (
       break;
     }
 
-    if (File->Type == EFI_FV_FILETYPE_FREEFORM) {
+    if ((File->Type == EFI_FV_FILETYPE_FREEFORM) &&
+        CompareGuid (&File->Name, &mDtbFileGuid))
+    {
       Section     = (EFI_COMMON_SECTION_HEADER *)(File + 1);
       SectionSize = Section->Size[0] | (Section->Size[1] << 8) | (Section->Size[2] << 16);
       if ((Section->Type == EFI_SECTION_RAW) &&
@@ -372,13 +397,24 @@ CopyDtbFromFv (
       {
         Src      = (UINT8 *)Section + sizeof (EFI_COMMON_SECTION_HEADER);
         CopySize = SectionSize - sizeof (EFI_COMMON_SECTION_HEADER);
-        Dst      = (UINT8 *)(UINTN)Destination;
+
+        /* Only accept a real flattened device tree. */
+        if ((CopySize < 8) ||
+            (Src[0] != 0xd0) || (Src[1] != 0x0d) ||
+            (Src[2] != 0xfe) || (Src[3] != 0xed))
+        {
+          break;
+        }
+
+        Dst = (UINT8 *)(UINTN)Destination;
         while (CopySize-- != 0) {
           *Dst++ = *Src++;
         }
 
         return SectionSize - sizeof (EFI_COMMON_SECTION_HEADER);
       }
+
+      break;
     }
 
     Offset += FileSize;

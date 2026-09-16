@@ -25,6 +25,7 @@
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiLib.h>
 
+#include <IndustryStandard/Pci22.h>
 #include <Guid/EventGroup.h>
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/PciEnumerationComplete.h>
@@ -587,6 +588,13 @@ LoongsonDisplayDxeEntryPoint (
   //
   // DC is PCI device 0:6:0; take its MMIO BAR0 (PMON reads the same BAR).
   //
+  // A device only answers memory cycles while COMMAND.MEM is set, and PCI
+  // enumeration on this platform leaves it clear (so the MMIO window at
+  // 0x60000000 decodes to nobody).  Enable it before touching the BAR.
+  //
+  PciOr16 (PCI_LIB_ADDRESS (0, 6, 0, PCI_COMMAND_OFFSET),
+           EFI_PCI_COMMAND_MEMORY_SPACE);
+
   Bar0 = PciRead32 (PCI_LIB_ADDRESS (0, 6, 0, 0x10));
   if ((Bar0 & 0xfffffff0u) == 0 || (Bar0 & 0xfffffff0u) == 0xfffffff0u) {
     DEBUG ((DEBUG_WARN, "%a: DC BAR0 unprogrammed (%08x), assuming 0x1f010000\n", __func__, Bar0));

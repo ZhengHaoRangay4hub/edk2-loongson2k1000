@@ -223,6 +223,19 @@ MapRtcResources (
                   EFI_PAGE_SIZE,
                   EFI_MEMORY_UC | EFI_MEMORY_RUNTIME
                   );
+  if (Status == EFI_ACCESS_DENIED) {
+    //
+    // The platform already described this range as memory mapped I/O through
+    // its resource HOBs, and GCD refuses to add memory space that is not
+    // NonExistent (see CoreConvertSpace(), GCD_ADD_MEMORY_OPERATION).  That is
+    // the normal state on this board, so just carry on: the range only has to
+    // be allocated and made runtime visible below, and the RUNTIME capability
+    // is already in place because CoreConvertSpace() forces
+    // EFI_MEMORY_RUNTIME | EFI_MEMORY_PORT_IO onto every MMIO descriptor.
+    //
+    Status = EFI_SUCCESS;
+  }
+
   if (EFI_ERROR (Status)) {
     DEBUG ((
       DEBUG_ERROR,

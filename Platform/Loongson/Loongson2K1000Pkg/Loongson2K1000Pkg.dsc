@@ -44,6 +44,18 @@
   #
   GCC:*_*_*_CC_FLAGS = -D DISABLE_NEW_DEPRECATED_INTERFACES
 
+  #
+  # PREMEM_STACK_TOP is consumed by the SEC assembly (Start.S); the board default
+  # is set in Loongson2K1000Pkg.fdf.inc and can be overridden from the command
+  # line (build -D PREMEM_STACK_TOP=0x90040000) for the QEMU smoke test.
+  #
+  # It has to go through PP_FLAGS, not CC_FLAGS: EDK2 assembles .S files with
+  # `$(PP) $(PP_FLAGS)` followed by `$(ASM) $(ASM_FLAGS)`, and CC_FLAGS never
+  # reaches either of those two steps - which is why the override silently had
+  # no effect on the stack constant until it was moved here.
+  #
+  GCC:*_*_*_PP_FLAGS = -D PREMEM_STACK_TOP=$(PREMEM_STACK_TOP)
+
 [BuildOptions.LOONGARCH64.EDKII.SEC]
   *_*_*_CC_FLAGS                 =
 
@@ -154,7 +166,18 @@
   FrameBufferBltLib                | MdeModulePkg/Library/FrameBufferBltLib/FrameBufferBltLib.inf
   DebugLib                         | MdePkg/Library/BaseDebugLibSerialPort/BaseDebugLibSerialPort.inf
   PeiServicesLib                   | MdePkg/Library/PeiServicesLib/PeiServicesLib.inf
+!if $(QEMU_FIT) == TRUE
+  #
+  # QEMU's ls2k machine backs only the first 1MB of the SPI NOR with the
+  # firmware image and drops writes anywhere in the flash window, so the
+  # variable store is moved into the low-DDR hole at 0x0F000000 (see the
+  # PcdLoongsonSpiNor*/PcdFlashNvStorage* overrides below) and served by a
+  # DRAM-backed device library.
+  #
+  VirtNorFlashDeviceLib            | Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonQemuNorLib/LoongsonQemuNorFlashDeviceLib.inf
+!else
   VirtNorFlashDeviceLib            | Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSpiNorLib/LoongsonSpiNorFlashDeviceLib.inf
+!endif
   VirtNorFlashPlatformLib          | Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSpiNorLib/LoongsonSpiNorFlashPlatformLib.inf
   ShellCEntryLib                   | ShellPkg/Library/UefiShellCEntryLib/UefiShellCEntryLib.inf
 
@@ -286,7 +309,7 @@
   gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel                     | 0x8000004F
 
 !if $(TARGET) == RELEASE
-  gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask                        | 0x21
+  gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask                        | 0x23
 !else
   gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask                        | 0x2f
 !endif
@@ -313,6 +336,32 @@
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingSize       | 0x10000
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase64       | 0x1c3C0000
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareSize         | 0x40000
+
+!if $(QEMU_FIT) == TRUE
+  #
+  # QEMU smoke build: the emulator only backs the first 1MB of the SPI NOR
+  # with the firmware image and drops every write in the flash window, so no
+  # variable store can ever be formatted there.  Park it in the 16MB DRAM hole
+  # between the end of the low DDR window (LS2K1000_LOW_RAM_LIMIT, 0x0F000000)
+  # and the start of the SoC MMIO window (0x10000000) instead, and let
+  # LoongsonQemuNorFlashDeviceLib implement NOR semantics on that DRAM.  The
+  # window is deliberately absent from the platform's resource HOBs, which is
+  # what lets VirtNorFlashDxe's gDS->AddMemorySpace() for it succeed.
+  #
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorBaseAddress           | 0x0F000000
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorVarStoreOffset        | 0x0
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase64       | 0x0F000000
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingBase64     | 0x0F040000
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase64       | 0x0F050000
+
+  #
+  # QEMU_FIT also drops SetupBrowserDxe/DisplayEngineDxe, so
+  # gEfiFormBrowser2ProtocolGuid is never installed.  BmRepairAllControllers()
+  # -- called from EfiBootManagerBoot() on every boot attempt -- asserts on that
+  # lookup, and ZeroGuid is the documented way to skip driver health handling.
+  #
+  gEfiMdeModulePkgTokenSpaceGuid.PcdDriverHealthConfigureForm | {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+!endif
 
   gEfiMdeModulePkgTokenSpaceGuid.PcdNullPointerDetectionPropertyMask   | 1
 
@@ -521,6 +570,15 @@
       # network command libs dropped: NetLib needs a NIC stack we do not ship yet
       BcfgCommandLib|ShellPkg/Library/UefiShellBcfgCommandLib/UefiShellBcfgCommandLib.inf
       PcdLib|MdePkg/Library/DxePcdLib/DxePcdLib.inf
+    <PcdsFixedAtBuild>
+      #
+      # ShellLibConstructor() returns EFI_NOT_FOUND unless either shell protocol
+      # already exists or auto-initialisation is off.  When the Shell runs as a
+      # boot option it installs those protocols itself, i.e. strictly after its
+      # library constructors, so with the default (TRUE) the Shell aborts in
+      # ASSERT_EFI_ERROR before reaching ShellAppMain().
+      #
+      gEfiShellPkgTokenSpaceGuid.PcdShellLibAutoInitialize|FALSE
   }
   ShellPkg/DynamicCommand/DpDynamicCommand/DpDynamicCommand.inf {
     <PcdsFixedAtBuild>

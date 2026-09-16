@@ -2,7 +2,9 @@
   NOR flash platform description for Loongson 2K1000LA.
 
   The SPI NOR is mapped read-only (XIP) at 0x1c000000. A 16MB part is
-  assumed; the UEFI variable store lives at offset 0x400000.
+  assumed; the UEFI variable store lives in the tail of the 4MB firmware
+  image, right behind FVMAIN_COMPACT (offset 0x370000, see
+  PcdLoongsonSpiNorVarStoreOffset).
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/

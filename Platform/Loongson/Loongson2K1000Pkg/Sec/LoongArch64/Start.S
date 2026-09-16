@@ -23,13 +23,32 @@
 
 #define BOOTCORE_ID  0
 
-/* On-chip SRAM overlay behind the SPI NOR XIP window - proven by PMON,
- * which places its early stack at start + 256K. */
+/*
+ * Pre-DRAM stack, at the very top of the 256 KB window that the boot ROM maps
+ * over the front of the SPI NOR image (LOCK_CACHE_SIZE = 0x40000 in PMON).
+ * That window is writable RAM, so a stack parked at 0x1c040000 grows down into
+ * it.  PMON does exactly this: `stack = start + LOCK_CACHE_SIZE` with PMON
+ * linked at 0x900000001c000000 but loaded at 0x800000001c000000, which puts
+ * the live SP at physical 0x1c040000.
+ *
+ * QEMU's ls2k machine models 0x1c000000-0x1c0fffff as a read-only SPI ROM, so
+ * writes there are dropped and the first `bl`/`ret` flies off.  The QEMU smoke
+ * test therefore overrides this at build time (`build -D PREMEM_STACK_TOP=...`,
+ * see the DSC) with 0x90040000 - the early stack address hardcoded by the
+ * vendor u-boot (0x9000000090040000) - so one source tree produces both the
+ * board image and a QEMU-runnable image.
+ */
+#ifndef PREMEM_STACK_TOP
 #define PREMEM_STACK_TOP  0x1c040000
+#endif
 
 /* Direct mapping windows, standard convention:
  *   DMW0 0x9000000000000000 : PLV0-3, MAT0 (strongly-ordered uncached)
- *   DMW1 0x8000000000000000 : PLV0-3, MAT1 (coherent cached)             */
+ *   DMW1 0x8000000000000000 : PLV0-3, MAT1 (coherent cached)
+ *
+ * This is the mirror of PMON's assignment (PMON: 0x8000 uncached / 0x9000
+ * cached); both are self-consistent as long as PHYS_TO_* and the windows agree,
+ * which they do - MMIO must land in MAT0 whichever VSEG carries it.         */
 #define DMW0_UNCACHED  (0x9000000000000000 | 0xf)
 #define DMW1_CACHED    (0x8000000000000000 | 0x1f)
 
@@ -52,21 +71,20 @@ ASM_PFX(_ModuleEntryPoint):
 	li.d	$t0, DMW1_CACHED
 	csrwr	$t0, CSR_DMW1
 	/*
-	 * CRMD = 0xb8: DATF/DATM cached, PG=1, and **DA=1** (direct address).
+	 * CRMD = 0xa8: DATF/DATM cached, DA=1 (direct address), PG=0.
 	 *
-	 * DA has priority over PG, so every access in the SEC phase is a direct
-	 * physical access: no TLB entry is consulted.  That matters on real
-	 * hardware, where the boot ROM only leaves the first 256 KB of the NOR
-	 * window mapped (it copies that much into the on-chip SRAM), while this
-	 * firmware reads its firmware volume up to 3.4 MB, writes the device tree
-	 * to low DRAM and moves its stack to DRAM.  With paging on and no page
-	 * tables of our own, the first such access raised a TLB exception and the
-	 * board reset in a loop.  Upstream's value (0xb0) works on QEMU only
-	 * because QEMU's firmware loader maps everything.
+	 * DA has priority over PG on paper, but the pair DA=1/PG=1 is not a legal
+	 * encoding: QEMU's ls2k run proves it - with 0xb8 the CPU fetches 0x5555
+	 * filler from 0x1c002030 while the memory there holds the correct
+	 * `bl 0x1c0020ec`, so the fetch never reaches the instruction.  The
+	 * previous 0xb8 read like "DA wins, paging is harmless"; 0xa8 keeps the
+	 * direct-address property without asserting paging at the same time.  The
+	 * SEC phase runs from the raw 0x1c000000 window (VSEG 0) and has no page
+	 * tables, so it needs DA - and PMON never sets DA and PG together either.
 	 *
 	 * Later phases install their own page tables as usual.
 	 */
-	li.w	$t0, 0xb8
+	li.w	$t0, 0xa8
 	csrwr	$t0, CSR_CRMD
 
 	/* Read physical cpu number id */

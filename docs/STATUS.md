@@ -1,8 +1,12 @@
 # LS2K1000LA 教育派 EDK II 移植：问题与分析总录
 
-> 状态截至 2026-09-15（二更）：**v7 真机验证通过启动**（良好供电下正常进 Boot），
-> 但 **HDMI 黑屏**；根因已用出厂二进制实锤定位（见 P5），修复方案已定，待出 v8。
+> 状态截至 2026-09-16：**v7 真机验证通过启动**（良好供电下正常进 Boot），HDMI 黑屏
+> 根因已实锤（P5，待 v8 上机）；**QEMU `ls2k` 机器上跑通完整固件，到达 `Shell>`**
+> ——闭合测试期间又挖出 3 个 BDS/Shell 缺陷（P6–P8），其中 P7 同样会让真机的
+> Shell 无法启动。
 > 按时间线的版本记录见 [BRINGUP.md](BRINGUP.md)；本文按"问题"组织，便于从故障现象反查根因与修法。
+> **进行中的 QEMU 8.2 移植与外设建模**见 [QEMU-PORT.md](QEMU-PORT.md)；
+> **接手入口**见 [HANDOVER.md](HANDOVER.md)。
 
 ---
 
@@ -13,6 +17,7 @@
 | 目标 | 全量 EDK II（UEFI）移植到龙芯 2K1000LA 教育派，替换原厂 PMON |
 | 构建 | GitHub Actions（增量缓存，~1.5 min/轮），双目标：真机 `Loongson2K1000Pkg` + QEMU 回归 `OvmfPkg/LoongArchVirt` |
 | QEMU 侧已验证 | 图形 BIOS、中文 LVGL 设置中心（超频/启动/PMON 参数页）、OpenWrt 24.10 启动 |
+| QEMU `ls2k` 闭环烟测 | 用本仓库固件 + `qemu-system-loongarch64 -M ls2k` 跑完整 DXE/BDS，**已到 `Shell>`**；期间修掉 P6–P8 |
 | 真机侧现状 | v1–v6 无输出/复位循环（根因见 P1–P4）→ **v7 启动正常**；剩余 **HDMI 黑屏**（根因见 P5，待 v8） |
 | 闪存 | W25Q32 4MB：FV 0x0–0x370000，变量区 0x370000–0x400000 |
 | 调试通道 | RS232 调试口（59/60）为唯一出厂输出；LVTTL 需固件开引脚复用（v7 起） |
@@ -151,6 +156,81 @@ OverclockDxe（只碰 CPU PLL 0x1fe00480）、PCI 主机桥窗口与 DTS 自洽�
 
 **v8 刷机后判读**：串口出现 `SII9022A not found on I2C1` → I2C1 使能位仍不对；
 出现 `GOP ready` 但仍黑 → 复核 DVO 位；两者补齐后预期直接出发光龙 logo。
+
+### P6 BDS 从不自动启动 Shell（v8 前后，QEMU 闭环测试发现）
+
+**现象**：QEMU `ls2k` 上固件一路跑到 BDS，串口收在
+`Process PlatformRecovery0000 ...` / `[Bds] Unable to boot!`，然后是
+`CpuDeadLoop()`。
+
+**定位**：Shell 其实**注册成功**了（自写诊断打印
+`Boot0000 attr=0x101 active=1 EFI Internal Shell`，`attr` 的 `0x100` 即
+`LOAD_OPTION_CATEGORY_APP`）。问题在 BdsDxe 的自动启动循环：
+
+```c
+// MdeModulePkg/Universal/BdsDxe/BdsEntry.c:406  (BootBootOptions)
+if ((BootOptions[Index].Attributes & LOAD_OPTION_CATEGORY) != LOAD_OPTION_CATEGORY_BOOT) {
+  continue;      // ← CATEGORY_APP 的项被无条件跳过
+}
+```
+
+`LOAD_OPTION_ACTIVE | LOAD_OPTION_CATEGORY_APP` 是从 OVMF 照抄的写法。OVMF 不出事是
+因为它编了 `BootManagerMenuApp`：所有 boot option 都启动失败后
+`PlatformBootManagerUnableToBoot()` 会拉起 Boot Manager Menu，用户再手选 Shell。
+本仓库的 `QEMU_FIT` 构建为把 LZMA 流塞进 QEMU 的 1MB 复位窗口，把
+`BootManagerMenuApp` 排除了 → 既没有可自动启动的项，也没有菜单 → 死循环。
+
+**修复**：Shell 改用 `LOAD_OPTION_ACTIVE`（不带 `CATEGORY_APP`）。
+`EfiBootManagerAddLoadOptionVariable(..., MAX_UINTN)` 把它追加到 `BootOrder` 末尾，
+真机上 `EfiBootManagerRefreshAllBootOption()` 枚举出的磁盘项仍排在前面先试，
+Shell 只在其它都启动不了时兜底。
+
+### P7 `PcdShellLibAutoInitialize` 挂在错误组件上 → Shell 一启动就 ASSERT（**真机同样中招**）
+
+**现象**：P6 修好后串口出现
+`BdsDxe: starting Boot0000 "EFI Internal Shell" from Fv(...)/FvFile(7C04A583-...)`，
+紧接着 `ASSERT [Shell] AutoGen.c(821)`，`Status = Not Found`。
+
+**定位**：AutoGen.c:821 那行对应 `ShellLibConstructor`。该构造函数在
+`ShellPkg/Library/UefiShellLib/UefiShellLib.c:378-409` 只有当 **Shell 协议**
+（或更老的 EDK `ShellEnvironment2` + `ShellInterface`）已经存在时才返回
+`EFI_SUCCESS`，否则返回 `EFI_NOT_FOUND`。Shell 作为 boot option 运行时，这些协议
+由 Shell 自己的入口点安装，**严格晚于库构造函数**。上游的解法是让构造函数不做事：
+`UefiShellLib.c:440-442` 里 `PcdShellLibAutoInitialize == 0` 就直接返回 `EFI_SUCCESS`。
+
+本仓库 DSC 里这个 PCD 只写在 `DpDynamicCommand.inf` 的组件块下，
+`Shell.inf` 的组件块**没有写** → 用 `ShellPkg.dec` 的默认值 `TRUE`。
+
+**修复**：给 `Shell.inf` 的组件块补
+`<PcdsFixedAtBuild> gEfiShellPkgTokenSpaceGuid.PcdShellLibAutoInitialize|FALSE`
+（与 OVMF 的 `ShellComponents.dsc.inc` 一致）。
+
+**影响范围**：这条与 QEMU 无关。真机从 Boot Manager Menu 里选 Shell 也同样会挂——
+即"BIOS 能进设置中心，但进不去 Shell"，只是 HDMI 黑屏掩盖了它。
+
+### P8 QEMU_FIT 构建缺 `gEfiFormBrowser2ProtocolGuid` → `BmRepairAllControllers()` 断言
+
+**现象**：P7 修好后 `ASSERT [BdsDxe] BmDriverHealth.c(553)`，`Status = Not Found`。
+
+**定位**：`EfiBootManagerBoot()` 在每次启动前都会调
+`BmRepairAllControllers(0)`（`BmBoot.c:2015`），而它开头就
+`LocateProtocol(gEfiFormBrowser2ProtocolGuid)` 并 `ASSERT_EFI_ERROR`
+（`BmDriverHealth.c:550-554`）。QEMU_FIT 构建排除了 `SetupBrowserDxe` /
+`DisplayEngineDxe`，该协议不存在。函数本身留了逃生口——
+`IsZeroGuid(PcdDriverHealthConfigureForm)` 就直接返回——但该 PCD 的默认值是
+`{0xf4,0xd9,0x96,0x42,...}`，非零。
+
+**修复**：QEMU_FIT 分支把 `PcdDriverHealthConfigureForm` 置为 ZeroGuid
+（`Loongson2K1000Pkg.dsc` 的 `[PcdsFixedAtBuild]`）。真机构建含 `SetupBrowserDxe`，
+行为不变。
+
+### 同轮修掉的其它断言（QEMU 闭环）
+
+| 断言 | 根因 | 修复 |
+|---|---|---|
+| `DxeMain.c(578)` — RTC 架构协议缺失 | `LsRealTimeClockLib::MapRtcResources()` 里 `gDS->AddMemorySpace()` 对已被平台资源 HOB 描述为 MMIO 的区间返回 `EFI_ACCESS_DENIED`（GCD 只接受 NonExistent 区间） | 容忍 `EFI_ACCESS_DENIED`（RUNTIME 属性由 `CoreConvertSpace()` 对 MMIO 描述符强制置位，不缺） |
+| `PciHostBridgeDxe` Out Of Resource | `PCI_ROOT_BRIDGE_APERTURE` 是 `{Base, Limit, Translation}`，原代码把**大小**填进了 Limit（`Limit < Base` → 所有窗口视为空） | `{0x18008000, 0x1800FFFF}` / `{0x60000000, 0x7FFFFFFF}`；并把 root bridge 改为堆分配（静态数组会被 `PciHostBridgeFreeRootBridges()` 释放两次） |
+| `PlatformBm.c(777)` — BootManagerMenu 不可用 | 平台没编 `BootManagerMenuApp` 时 `PlatformRegisterOptionsAndKeys()` 直接断言 | 降级为 `DEBUG_WARN` 并返回（F2/ESC 不映射） |
 
 ---
 

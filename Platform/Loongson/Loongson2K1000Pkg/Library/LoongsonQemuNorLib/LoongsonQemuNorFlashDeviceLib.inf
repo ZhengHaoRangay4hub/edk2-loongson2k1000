@@ -1,0 +1,26 @@
+## @file
+#  QEMU-only VirtNorFlashDeviceLib backed by plain DRAM (see the .c header).
+#
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 1.29
+  BASE_NAME                      = LoongsonQemuNorFlashDeviceLib
+  FILE_GUID                      = 4d7e6f21-8a3b-4c5d-9e0f-1a2b3c4d5e6f
+  MODULE_TYPE                    = DXE_DRIVER
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = VirtNorFlashDeviceLib
+
+[Sources]
+  LoongsonQemuNorFlashDeviceLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  OvmfPkg/OvmfPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib

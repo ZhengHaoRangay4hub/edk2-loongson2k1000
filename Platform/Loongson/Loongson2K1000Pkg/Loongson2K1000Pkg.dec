@@ -32,7 +32,15 @@
   gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorBaseAddress|0x1c000000|UINT32|0x00001004
 
   ## Offset of the UEFI variable store inside the SPI NOR.
-  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorVarStoreOffset|0x00400000|UINT32|0x00001005
+  #
+  #  This has to agree with the PcdFlashNvStorage*Base64 values in the DSC
+  #  (0x1c370000), i.e. it is the tail of the 4MB firmware image described by
+  #  [FD.UEFI] in Loongson2K1000Pkg.fdf.  VirtNorFlashDxe refuses to install an
+  #  FVB protocol - and therefore never installs gEdkiiNvVarStoreFormattedGuid -
+  #  unless this region contains the PcdFlashNvStorageVariableBase64 window, so
+  #  a mismatch here silently disables UEFI variables altogether.
+  #
+  gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorVarStoreOffset|0x00370000|UINT32|0x00001005
 
   ## Size of the UEFI variable store region (variable + FTW working + spare).
   gLoongson2K1000TokenSpaceGuid.PcdLoongsonSpiNorVarStoreSize|0x00090000|UINT32|0x00001006

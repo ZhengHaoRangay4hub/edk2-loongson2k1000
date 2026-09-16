@@ -203,6 +203,57 @@ SII9022A 收不到像素时钟；I2C1 使能位也可能缺失导致 9022A 初�
 
 ---
 
+## QEMU `ls2k` 闭环烟测 —— 上机前先证明固件本身能跑
+
+**为什么做**：到 v8 为止，每次判断"固件到底行不行"都要烧一次真机，而真机只有
+RS232 一路输出（HDMI 还黑，P5），一次上机成本很高。QEMU 的 `ls2k` 机器建模了
+2K1000LA 的 CPU / DDR / PCI / 串口，可以把**同一份 `UEFI.fd`** 从 SEC 一路带到
+BDS —— 反馈快、可反复重跑，用来把"刷上去看运气"换成"先在模拟器里跑通"。
+
+**板级参数的来源**：内存映射（`0x200000+0xee00000` / `0x90000000+0x70000000`）、
+UART0 分频（PLL 前 54 / 后 68）、`0x1fe00420` 与 `0x1fe00430` 两处使能位，都来自
+逆向出来的出厂 PMON（见上文 v3 / v8 两节），与 QEMU 的建模逐项交叉核对过。
+
+**QEMU `ls2k` 的两个硬限制**（决定了这个镜像要怎么出）：
+
+| 限制 | 后果 | 处理 |
+|---|---|---|
+| NOR 只读窗口只有前 1MB（`0x1c000000-0x1c0fffff`，`romd`），窗口之外读回 0、写入丢弃 | `DxeIpl` 解压 `FVMAIN_COMPACT` 时越过 1MB 会被截断 | 压缩后必须 < 1MB：当前用量 811,040 B（卷容量 `0x370000`，22%） |
+| flash 窗口的写入被丢弃 | 变量存储永远格式化失败，`gEdkiiNvVarStoreFormattedGuid` 无人安装 → DxeCore 断言 | `-D QEMU_FIT=TRUE` 用 `LoongsonQemuNorFlashDeviceLib` 在 DRAM 上模拟 NOR 语义，变量区搬到低 DDR 空洞 `0x0F000000` |
+
+**跑通这条路径时修掉的缺陷**：P6（BDS 不自动启动 Shell）、P7
+（`PcdShellLibAutoInitialize` 挂错组件，Shell 一启动即 ASSERT —— **真机同样中招**）、
+P8（QEMU_FIT 缺 `gEfiFormBrowser2ProtocolGuid`），以及 RTC / PCI root bridge
+两处断言。全部根因见 [STATUS.md](STATUS.md)。
+
+**结果**：
+
+```
+BdsDxe: loading Boot0000 "EFI Internal Shell" from Fv(5D19A5B3-...)/FvFile(7C04A583-...)
+UEFI Interactive Shell v2.2
+EDK II
+UEFI v2.70 (EDK II, 0x00010000)
+Mapping table
+map: No mapping found.
+Press ESC in 2 seconds to skip startup.nsh or any other key to continue.
+Shell>
+```
+
+同一镜像在 `QMEM=2048` 与 `QMEM=1024` 下都到达 `Shell>`（变量区在 `0x0F000000`，
+两种内存下都在低窗口中）。
+
+**这条路径覆盖不到什么**（别误读结论）：**出厂** 3.1 QEMU 的 `ls2k` 不建模
+DC / SII9022A / I2C，**HDMI 通路（P5）在那里无法验证**；它证明的是
+「SEC → PEI → DXE → BDS → 控制台 → Shell」这条软件链路在真实固件镜像上成立。
+
+> 后续进展（2026-09-16 深夜）：正在把 `ls2k` 机器移植到 **QEMU 8.2**（`foxsen/qemu-up`
+> 的 `ls2k1000` 分支）并**补建模缺失外设**——`hw/display/sii9022.c`（SII9022A HDMI
+> 发送器）已挂到 I2C1 @ `0x39`，另有 `ls2k_apb.c` / `ls2k_pci_stub.c` 及一批逐 fault
+> 补的寄存器。固件在新 QEMU 上已从「46 字节串口」推进到 PEI，当前卡在双核 host
+> SIGSEGV。细节见 [QEMU-PORT.md](QEMU-PORT.md)，接手入口见 [HANDOVER.md](HANDOVER.md)。
+
+---
+
 ## 镜像版本一览
 
 | 版本 | commit | 整片镜像 MD5 | 要点 | 真机结果 |
@@ -211,7 +262,7 @@ SII9022A 收不到像素时钟；I2C1 使能位也可能缺失导致 9022A 初�
 | v3 | d144ab2 | `f59544a6...4adb` | SEC 顺序 + SPI 分频 | （并入 v4） |
 | v4 | 921d853 | `04828616...a675` | 控制台切 TTL+镜像 | （并入 v5） |
 | v5 | 0456af1 | `5fd0fe45...54fd` | 四路输出 | **复位循环** |
-| v6 | ca04c90 | `ffdedf63...9423` | DA=1 + 串口收敛 | 待验证 |
+| v6 | ca04c90 | `ffdedf63...9423` | DA=1 + 串口收敛 | （并入 v7） |
 | v7 | c76951b | `3b76cc79...c607` | UART3 引脚复用 | **启动正常**，HDMI 黑 |
 | v8 | （本提交） | 见 CI 产物 | DVO/I2C1 使能 + GOP 修复 | 待验证 |
 
@@ -236,3 +287,21 @@ cd ~/Downloads/CH341A
   打印到第几级＝低窗口取指真实上限）；
 - 串口通、卡 DXE → 接着查设备枚举日志（PCIe/NVMe/USB）与 HDMI 通路
   （DC PLL、SII9022A 的 I2C 时序）。
+
+---
+
+## v8（待上机）——真机镜像（含 P5 显示修复）
+
+| 项 | 值 |
+|---|---|
+| 整片镜像 | `~/Downloads/ls2k-new-v8/UEFI_4MB_v8.bin` |
+| **MD5** | `eeb876f5ddb4eec415178b1003b93261` |
+| 固件卷 MD5 | `c78f0687707b56d39971be8a34cb97b4` |
+| 变量区 | 沿用板上 v7 的变量区（0x370000-0x400000） |
+| 内容 | P5 修复（DVO 引脚输出 + I2C1 使能启用）+ GOP Blt 修复 + QEMU 闭环期间的全部真机侧修订 |
+
+构建来源：工作区（含未提交的 QEMU 支持改动，与 QEMU 闭环所用源码一致）。
+**上机判读**：HDMI 出龙 logo + 设置中心 → P5 闭环；`SII9022A not found on I2C1` → 回查
+0x1fe00420 实值；`GOP ready` 仍黑 → 回查 0x1fe00430 的 DVO 位。
+
+QEMU 侧同日达成闭环（SEC→Shell>，截图非黑），过程与配方见 QEMU-PORT.md。

@@ -68,7 +68,25 @@ InitializeRamRegions (
   VOID
   )
 {
-  AddMemoryRangeHob (LS2K1000_LOW_RAM_BASE, LS2K1000_LOW_RAM_LIMIT);
+  //
+  // The low DDR window has to be described from address 0, not from
+  // LS2K1000_LOW_RAM_BASE.  CoreInitializeMemoryServices() in DxeCore looks for
+  // a TESTED SYSTEM_MEMORY resource HOB that covers the PHIT range
+  // EfiFreeMemoryBottom..EfiFreeMemoryTop, and EfiFreeMemoryBottom is the end
+  // of the HOB list sitting at the foot of PEI memory (0x90000 + a little).
+  // A descriptor that starts at 0x200000 leaves that range uncovered, and the
+  // high window is skipped as well, so the search fails and DxeCore trips
+  // ASSERT(Found) in Gcd.c before it dispatches anything.
+  //
+  // Describing RAM from 0 is also the accurate thing to do: the bytes the
+  // firmware itself occupies are fenced off with allocation HOBs instead of by
+  // omitting them from the resource descriptor -- page 0 by
+  // PcdNullPointerDetectionPropertyMask, and 0x10000..0x90000 by
+  // PeiFvInitialization().  The DTB staging copy at 0x100000
+  // (PcdDeviceTreeInitialBaseAddress) is dead by the time DXE runs: PlatformPei
+  // relocates the tree and hands it over through the FDT HOB.
+  //
+  AddMemoryRangeHob (0, LS2K1000_LOW_RAM_LIMIT);
   AddMemoryRangeHob (LS2K1000_HIGH_RAM_BASE, LS2K1000_HIGH_RAM_LIMIT);
 
   //

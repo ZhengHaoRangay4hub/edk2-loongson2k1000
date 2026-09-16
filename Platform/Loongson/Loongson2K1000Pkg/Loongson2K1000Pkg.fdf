@@ -86,6 +86,7 @@ INF  MdeModulePkg/Bus/Pci/PciBusDxe/PciBusDxe.inf
 #
 # Storage / USB behind the internal PCIe complex
 #
+!if $(QEMU_FIT) == FALSE
 INF  MdeModulePkg/Bus/Pci/SataControllerDxe/SataControllerDxe.inf
 INF  MdeModulePkg/Bus/Ata/AtaBusDxe/AtaBusDxe.inf
 INF  MdeModulePkg/Bus/Ata/AtaAtapiPassThru/AtaAtapiPassThru.inf
@@ -95,6 +96,7 @@ INF  MdeModulePkg/Bus/Pci/EhciDxe/EhciDxe.inf
 INF  MdeModulePkg/Bus/Usb/UsbBusDxe/UsbBusDxe.inf
 INF  MdeModulePkg/Bus/Usb/UsbKbDxe/UsbKbDxe.inf
 INF  MdeModulePkg/Bus/Usb/UsbMassStorageDxe/UsbMassStorageDxe.inf
+!endif
 
 #
 # File system
@@ -103,27 +105,42 @@ INF  MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
 INF  MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
 INF  MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
 INF  FatPkg/EnhancedFatDxe/Fat.inf
+!if $(QEMU_FIT) == FALSE
 INF  MdeModulePkg/Universal/Disk/UdfDxe/UdfDxe.inf
+!endif
 
 #
 # BDS
 #
 INF  MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
 INF  MdeModulePkg/Universal/DevicePathDxe/DevicePathDxe.inf
+!if $(QEMU_FIT) == FALSE
 INF  MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
 INF  MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
+!endif
 INF  MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
-INF  MdeModulePkg/Logo/LogoDxe.inf
+#
+# The display controller stays in the QEMU_FIT image on purpose: the ls2k
+# machine has a `graphics` option that instantiates the same PCI 00:06.0
+# frame buffer the board uses, so this image is the only place where the DC
+# bring-up path can be run end to end (and screenshotted) before touching
+# hardware.  LogoDxe is not needed for that - the driver paints its own logo.
+#
 INF  Platform/Loongson/Loongson2K1000Pkg/LoongsonDisplayDxe/LoongsonDisplayDxe.inf
+!if $(QEMU_FIT) == FALSE
+INF  MdeModulePkg/Logo/LogoDxe.inf
 INF  Platform/Loongson/Loongson2K1000Pkg/LoongsonOverclockDxe/LoongsonOverclockDxe.inf
 INF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
 INF  LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf
+!endif
 
 #
 # Console
 #
 INF  MdeModulePkg/Universal/Console/ConPlatformDxe/ConPlatformDxe.inf
+!if $(QEMU_FIT) == FALSE
 INF  MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsoleDxe.inf
+!endif
 INF  MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf
 INF  MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf
 INF  MdeModulePkg/Universal/PrintDxe/PrintDxe.inf
@@ -132,8 +149,17 @@ INF  MdeModulePkg/Universal/SerialDxe/SerialDxe.inf
 #
 # UEFI Shell
 #
+# The shell stays in the QEMU_FIT image on purpose: reaching an interactive
+# prompt is the whole point of the smoke test, and it is the only way to poke at
+# the machine map that the emulator reports.  Anything else added here has to be
+# checked against the 1 MB reset window -- the ls2k machine maps only the first
+# 1 MB of the NOR read-only, and DxeIpl truncates the LZMA stream that runs past
+# it.
+#
 INF  ShellPkg/Application/Shell/Shell.inf
+!if $(QEMU_FIT) == FALSE
 INF  ShellPkg/DynamicCommand/DpDynamicCommand/DpDynamicCommand.inf
+!endif
 
 #####################################################################################################
 [FV.FVMAIN_COMPACT]
