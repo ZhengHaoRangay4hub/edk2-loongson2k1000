@@ -1,0 +1,26 @@
+## @file
+#  Boot progress log on the SPI NOR flash (BASE library, SEC safe).
+#
+#  Copyright (c) 2026, Loongson2K1000LA EDK2 port contributors.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = LoongsonBootLogLib
+  FILE_GUID                      = 3C7A1E42-9B55-4D18-A6E3-5F20C4B7D918
+  MODULE_TYPE                    = BASE
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = LoongsonBootLogLib
+
+[Sources]
+  LoongsonBootLogLib.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dec
+
+[LibraryClasses]
+  BaseLib
+  IoLib

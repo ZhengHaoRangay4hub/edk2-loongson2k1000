@@ -31,6 +31,7 @@
   EmbeddedPkg/EmbeddedPkg.dec
   MdeModulePkg/MdeModulePkg.dec
   MdePkg/MdePkg.dec
+  Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dec
   OvmfPkg/OvmfPkg.dec
   SecurityPkg/SecurityPkg.dec
   ShellPkg/ShellPkg.dec
@@ -40,6 +41,7 @@
   BaseMemoryLib
   BootLogoLib
   DebugLib
+  LoongsonBootLogLib
   DevicePathLib
   MemoryAllocationLib
   PcdLib

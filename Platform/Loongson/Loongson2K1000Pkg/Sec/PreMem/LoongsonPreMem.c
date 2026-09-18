@@ -18,6 +18,7 @@
 #include <Library/IoLib.h>
 #include <Library/PcdLib.h>
 #include "PreMem.h"
+#include <Library/LoongsonBootLog.h>
 
 /* Uncached alias of a physical address (DMW0 configured in Start.S). */
 #define UNCACHED(x)  ((UINTN)(0x9000000000000000ULL | (UINT64)(x)))
@@ -440,6 +441,8 @@ PostMemInit (
               (EFI_PHYSICAL_ADDRESS)FixedPcdGet64 (PcdDeviceTreeInitialBaseAddress)
               );
 
+  LoongsonBootLogEvent (BOOTLOG_SEC_DTB, (UINT32)DtbSize);
+
   if (DtbSize == 0) {
     EarlyPutString ("WARNING: DTB not found in firmware volume!\r\n");
   }
@@ -463,16 +466,29 @@ PreMemInit (
      SPI controller is reachable without the BAR (PMON pokes it first), which
      is why the speedup can come before the BAR. */
   SpiFlashSpeedup ();
+  LoongsonBootLogEvent (BOOTLOG_SEC_SPI, 0);
+
   ApbBarConfig ();
+  LoongsonBootLogEvent (BOOTLOG_SEC_APB, 0);
+
   UartPinMuxInit ();
+  LoongsonBootLogEvent (
+    BOOTLOG_SEC_PINMUX,
+    MmioRead32 (SYSCONF (0x420)) & 0xF
+    );
+
   WatchdogClose ();
+  LoongsonBootLogEvent (BOOTLOG_SEC_WATCHDOG, 0);
 
   EarlySerialInit ();
-  EarlyPutString ("\r\nLoongson2K1000LA EDK2 SEC booting... [v8b]\r\n");
+  LoongsonBootLogEvent (BOOTLOG_SEC_UART, 0);
+  EarlyPutString ("\r\nLoongson2K1000LA EDK2 SEC booting... [v9]\r\n");
 
   PcieEarlyConf ();
+  LoongsonBootLogEvent (BOOTLOG_SEC_PCIE, 0);
 
   EarlyPutString ("SoC early init done\r\n");
+  LoongsonBootLogEvent (BOOTLOG_SEC_SOC_DONE, 0);
 
   return 0;
 }

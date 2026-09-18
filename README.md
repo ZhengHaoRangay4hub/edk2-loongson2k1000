@@ -206,4 +206,7 @@ GitHub Actions 现在带三层缓存，避免每次从零编译（实测 5–7 �
 
 - **[docs/STATUS.md](docs/STATUS.md)** —— 按问题组织：每个故障的根因、修复与速查表（串口/引脚复用/供电/启动窗口）。
 - **[docs/BRINGUP.md](docs/BRINGUP.md)** —— 按时间线：每一版的现象、定位、修改与结论，含全部镜像 MD5。
-- 诊断工具（NOR 低窗口阶梯探针生成器）在 [tools/make_nor_probe.py](tools/make_nor_probe.py)。
+- **[docs/BOOTLOG.md](docs/BOOTLOG.md)** —— Flash 进度日志：没有串口时，读芯片就能知道固件跑到哪一步。
+- 诊断工具：[tools/read_bootlog.sh](tools/read_bootlog.sh)（读芯片 + 解码）、
+  [tools/decode_bootlog.py](tools/decode_bootlog.py)、
+  [tools/make_nor_probe.py](tools/make_nor_probe.py)（NOR 低窗口阶梯探针生成器）。

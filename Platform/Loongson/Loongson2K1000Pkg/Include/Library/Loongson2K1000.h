@@ -50,6 +50,16 @@
 
 #define LS2K_SPI0_BASE          0x1fff0220  /* on-chip SPI master (SPI NOR) */
 
+/*
+ * Boot progress log: 64 KB carved out of the firmware volume's tail, just
+ * below the variable store, so the firmware can record how far it got without
+ * a serial console.  Read the chip with a programmer and decode with
+ * tools/decode_bootlog.py.  FVMAIN_SIZE in Loongson2K1000Pkg.fdf.inc must stay
+ * below this address.
+ */
+#define LS2K_BOOTLOG_BASE       0x360000
+#define LS2K_BOOTLOG_SIZE       0x10000
+
 #define LS2K_PMC_BASE           0x1fe27000  /* power management (reset/shutdown) */
 
 #define LS2K_RTC_BASE           0x1fe27400  /* TOY/RTC counters */

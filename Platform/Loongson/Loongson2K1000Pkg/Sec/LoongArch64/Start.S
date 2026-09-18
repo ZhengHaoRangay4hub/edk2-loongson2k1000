@@ -20,6 +20,7 @@
 #include <Library/BaseMemoryLib.h>
 #include <Register/LoongArch64/Csr.h>
 #include <Protocol/DebugSupport.h>
+#include <Library/LoongsonBootLog.h>
 
 #define BOOTCORE_ID  0
 
@@ -100,16 +101,45 @@ ASM_PFX(_ModuleEntryPoint):
 	li.d	$sp, PREMEM_STACK_TOP
 	addi.d	$sp, $sp, -0x8
 
+	/*
+	 * Boot progress log.  Every milestone is recorded in the SPI NOR so a
+	 * board with no usable serial console can still be diagnosed by reading
+	 * the chip with a programmer (tools/decode_bootlog.py).
+	 */
+	bl	LoongsonBootLogBoot
+	li.w	$a0, BOOTLOG_SEC_ENTRY
+	li.d	$a1, 0
+	bl	LoongsonBootLogEvent
+
 	bl	PreMemInit		/* C: early UART + SoC early init */
+
+	li.w	$a0, BOOTLOG_SEC_CLK_BEGIN
+	li.d	$a1, 0
+	bl	LoongsonBootLogEvent
 	bl	ClkSettingAsm		/* asm: CPU/DDR/GPU PLLs (PMON port) */
+	li.w	$a0, BOOTLOG_SEC_CLK_DONE
+	li.d	$a1, 0
+	bl	LoongsonBootLogEvent
+
+	li.w	$a0, BOOTLOG_SEC_DDR_BEGIN
+	li.d	$a1, 0
+	bl	LoongsonBootLogEvent
 	bl	DdrEntryAsm		/* asm: DDR3 init + leveling (PMON port),
 					   leaves memory size in $s2 */
+	li.w	$a0, BOOTLOG_SEC_DDR_DONE
+	move	$a1, $s2		/* memory size reported by the DDR code */
+	bl	LoongsonBootLogEvent
 
 	/* DRAM is up: switch the stack to the permanent temporary RAM. */
 	li.d	$sp, FixedPcdGet64(PcdOvmfSecPeiTempRamBase) + FixedPcdGet32(PcdOvmfSecPeiTempRamSize)
 	addi.d	$sp, $sp, -0x8
 
-	/* Publish the device tree for the FDT based library classes. */
+	li.w	$a0, BOOTLOG_SEC_TO_PEI
+	li.d	$a1, 0
+	bl	LoongsonBootLogEvent
+
+	/* Publish the device tree for the FDT based library classes.
+	   PostMemInit records the outcome in the boot log itself. */
 	bl	PostMemInit
 
 	/* Load the exception vector base address */

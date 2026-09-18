@@ -136,6 +136,11 @@
   CustomizedDisplayLib             | Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf
   LvglLib                          | LvglPkg/Library/LvglLib/LvglLib.inf
   DebugPrintErrorLevelLib          | MdePkg/Library/BaseDebugPrintErrorLevelLib/BaseDebugPrintErrorLevelLib.inf
+  #
+  # Progress log in the SPI NOR: works from SEC up, so early bring-up failures
+  # are visible on a programmer read of the chip.
+  #
+  LoongsonBootLogLib               | Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonBootLogLib/LoongsonBootLogLib.inf
   VarCheckLib                      | MdeModulePkg/Library/VarCheckLib/VarCheckLib.inf
   TpmMeasurementLib                | MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
   AuthVariableLib                  | MdeModulePkg/Library/AuthVariableLibNull/AuthVariableLibNull.inf

@@ -22,6 +22,7 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Library/MpInitLib.h>
 #include <Library/PcdLib.h>
+#include <Library/LoongsonBootLog.h>
 #include <Library/PeimEntryPoint.h>
 #include <Library/PeiServicesLib.h>
 #include <Library/PlatformHookLib.h>
@@ -253,6 +254,7 @@ AddFdtHob (
   DEBUG ((DEBUG_ERROR, "AddFdtHob: NewBase=0x%lx\n", (UINT64)(UINTN)NewBase));
   ASSERT (NewBase != NULL);
   FdtOpenInto (Base, NewBase, EFI_PAGES_TO_SIZE (FdtPages));
+  LoongsonBootLogEvent (BOOTLOG_PEI_FDT, (UINT32)(UINTN)NewBase & 0xFFFFFF);
 
   FdtHobData = BuildGuidHob (&gFdtHobGuid, sizeof *FdtHobData);
   ASSERT (FdtHobData != NULL);
@@ -278,6 +280,7 @@ InitializePlatform (
   EFI_MEMORY_DESCRIPTOR  *MemoryTable;
 
   DEBUG ((DEBUG_INFO, "Platform PEIM Loaded\n"));
+  LoongsonBootLogEvent (BOOTLOG_PEI_ENTRY, 0);
 
   Status = PeiServicesSetBootMode (mBootMode);
   ASSERT_EFI_ERROR (Status);

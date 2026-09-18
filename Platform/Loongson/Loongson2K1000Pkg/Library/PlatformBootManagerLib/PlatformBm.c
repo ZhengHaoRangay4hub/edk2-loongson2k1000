@@ -18,6 +18,7 @@
 #include <Library/PlatformBmPrintScLib.h>
 #include <Library/TpmPlatformHierarchyLib.h>
 #include <Library/UefiBootManagerLib.h>
+#include <Library/LoongsonBootLog.h>
 #include <Protocol/DevicePath.h>
 #include <Protocol/FirmwareVolume2.h>
 #include <Protocol/GraphicsOutput.h>
@@ -835,6 +836,8 @@ PlatformBootManagerBeforeConsole (
   VOID
   )
 {
+  LoongsonBootLogEvent (BOOTLOG_BDS_ENTRY, 0);
+
   PublishFdtConfigurationTable ();
 
   //

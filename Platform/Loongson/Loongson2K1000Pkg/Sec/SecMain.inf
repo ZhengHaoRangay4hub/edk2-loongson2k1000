@@ -29,6 +29,7 @@
 
 [Packages]
   MdePkg/MdePkg.dec
+  Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dec
   MdeModulePkg/MdeModulePkg.dec
   OvmfPkg/OvmfPkg.dec
   UefiCpuPkg/UefiCpuPkg.dec
@@ -39,6 +40,7 @@
   CpuExceptionHandlerLib
   DebugAgentLib
   DebugLib
+  LoongsonBootLogLib
   IoLib
   PcdLib
   PeCoffLib

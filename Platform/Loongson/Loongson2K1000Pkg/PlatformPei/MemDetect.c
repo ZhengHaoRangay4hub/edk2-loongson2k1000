@@ -17,6 +17,7 @@
 #include <Library/DebugLib.h>
 #include <Library/HobLib.h>
 #include <Library/PcdLib.h>
+#include <Library/LoongsonBootLog.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/ResourcePublicationLib.h>
 #include <Uefi/UefiSpec.h>
@@ -88,6 +89,15 @@ InitializeRamRegions (
   //
   AddMemoryRangeHob (0, LS2K1000_LOW_RAM_LIMIT);
   AddMemoryRangeHob (LS2K1000_HIGH_RAM_BASE, LS2K1000_HIGH_RAM_LIMIT);
+
+  LoongsonBootLogEvent (
+    BOOTLOG_PEI_MEM,
+    (UINT32)((LS2K1000_LOW_RAM_LIMIT - LS2K1000_LOW_RAM_BASE) >> 20)
+    );
+  LoongsonBootLogEvent (
+    BOOTLOG_PEI_MEM_HIGH,
+    (UINT32)((LS2K1000_HIGH_RAM_LIMIT - LS2K1000_HIGH_RAM_BASE) >> 20)
+    );
 
   //
   // Describe the MMIO windows so the DXE GCD knows about them.

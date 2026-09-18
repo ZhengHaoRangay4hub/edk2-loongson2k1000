@@ -140,6 +140,19 @@ GPUBASE=`0xd0000000`。）
   板级默认位置，固件会卡死在 DxeIpl（表现为串口停在 Install PPI 后不再推进）。
 - 临时 LS2KMARK 打印已全部删除。
 
+### 3.5 boot flash 窗口与本地总线别名（2026-09-18）
+
+机器原先只映射 SPI flash 的**前 1 MB**（`0x1c000000-0x1c0fffff`），1 MB 以上被
+`lioflash`/`lioflash1`（CFI 本地总线 flash，本板未装配）的别名覆盖，表现为
+"窗口外读回 0、写入丢弃"。日志区放在 3.375 MB 处，所以：
+
+- `spi-flash` 的 `size` 由 `0x100000` 改为 `0x400000`（与板上 W25Q32 一致）；
+- `lioflash` 别名的安装与重装（GPIO 绑带寄存器写入路径）**取消**——这块板从 SPI 启动、
+  没有本地总线 flash，窗口应当完整显示 SPI 芯片。
+
+顺带解决了"1 MB 窗口导致 QEMU_FIT 必须压缩固件"的根因：真机镜像（1.40 MB）现在
+在 QEMU 里也能被读取（板级镜像仍卡在 DxeIpl 解压 10.4 MB 卷，是模拟器速度问题）。
+
 ### 3.3 临时调试标记（**收尾时必须删除**）
 
 `hw/loongarch/2k1000.c` 中现有 6 处 `fprintf(stderr, "LS2KMARK ...")`：

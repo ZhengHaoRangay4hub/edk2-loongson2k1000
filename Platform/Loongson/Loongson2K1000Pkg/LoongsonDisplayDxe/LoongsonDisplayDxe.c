@@ -15,6 +15,7 @@
 
 #include <PiDxe.h>
 #include <Library/BaseLib.h>
+#include <Library/LoongsonBootLog.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/CacheMaintenanceLib.h>
 #include <Library/DebugLib.h>
@@ -595,9 +596,14 @@ LoongsonDisplayDxeEntryPoint (
   PciOr16 (PCI_LIB_ADDRESS (0, 6, 0, PCI_COMMAND_OFFSET),
            EFI_PCI_COMMAND_MEMORY_SPACE);
 
+  LoongsonBootLogEvent (BOOTLOG_DXE_ENTRY, 0);
+
   Bar0 = PciRead32 (PCI_LIB_ADDRESS (0, 6, 0, 0x10));
+  /* The log slot carries 24 bits: drop the low 12 zero bits of the BAR. */
+  LoongsonBootLogEvent (BOOTLOG_DXE_DISPLAY, Bar0 >> 12);
   if ((Bar0 & 0xfffffff0u) == 0 || (Bar0 & 0xfffffff0u) == 0xfffffff0u) {
     DEBUG ((DEBUG_WARN, "%a: DC BAR0 unprogrammed (%08x), assuming 0x1f010000\n", __func__, Bar0));
+    LoongsonBootLogEvent (BOOTLOG_DXE_DC_FALLBACK, 0);
     mDcBase = LS_MMIO_UNCACHED (0x1f010000);
   } else {
     mDcBase = LS_MMIO_UNCACHED (Bar0 & 0xfffffff0u);
@@ -633,6 +639,11 @@ LoongsonDisplayDxeEntryPoint (
 
   if (!Sii9022aInit ()) {
     DEBUG ((DEBUG_WARN, "%a: SII9022A not found on I2C1; continuing with DC only\n", __func__));
+    LoongsonBootLogEvent (BOOTLOG_DXE_SII_MISSING, 0);
+  } else {
+    /* The transmitter's ID registers are what proved the I2C link is alive in
+       the PMON port as well (0xb0/0x02/0x03 on this board). */
+    LoongsonBootLogEvent (BOOTLOG_DXE_SII_FOUND, 0);
   }
 
   mGopInfo.Version                    = 0;
@@ -666,8 +677,15 @@ LoongsonDisplayDxeEntryPoint (
                   NULL
                   );
   if (EFI_ERROR (Status)) {
+    LoongsonBootLogEvent (BOOTLOG_DXE_GOP_FAIL, (UINT32)Status);
     return Status;
   }
+
+  /* width and height each fit in 12 bits, so pack them into the 24-bit slot. */
+  LoongsonBootLogEvent (
+    BOOTLOG_DXE_GOP_READY,
+    ((UINT32)MODE_HR << 12) | (UINT32)MODE_VR
+    );
 
   Status = gBS->CreateEventEx (
                   EVT_NOTIFY_SIGNAL,

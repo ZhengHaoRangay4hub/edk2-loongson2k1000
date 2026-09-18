@@ -21,6 +21,7 @@
 [Packages]
   EmbeddedPkg/EmbeddedPkg.dec
   MdePkg/MdePkg.dec
+  Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dec
   MdeModulePkg/MdeModulePkg.dec
   OvmfPkg/OvmfPkg.dec
   UefiCpuPkg/UefiCpuPkg.dec
@@ -37,6 +38,7 @@
   BaseMemoryLib
   CpuMmuInitLib
   DebugLib
+  LoongsonBootLogLib
   FdtLib
   HobLib
   MemoryAllocationLib
