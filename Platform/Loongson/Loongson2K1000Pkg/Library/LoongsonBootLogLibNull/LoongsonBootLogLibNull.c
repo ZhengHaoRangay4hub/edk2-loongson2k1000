@@ -25,6 +25,23 @@ LoongsonBootLogBoot (
 
 VOID
 EFIAPI
+LoongsonBootBeep (
+  IN UINTN  Count
+  )
+{
+  (VOID)Count;
+}
+
+VOID
+EFIAPI
+LoongsonBootBeepLong (
+  VOID
+  )
+{
+}
+
+VOID
+EFIAPI
 LoongsonBootLogEvent (
   IN UINT8   Code,
   IN UINT32  Arg

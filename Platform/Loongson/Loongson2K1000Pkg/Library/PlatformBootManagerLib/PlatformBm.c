@@ -836,6 +836,9 @@ PlatformBootManagerBeforeConsole (
   VOID
   )
 {
+  /* One long beep: the firmware reached the boot manager. */
+  LoongsonBootBeepLong ();
+
   LoongsonBootLogEvent (BOOTLOG_BDS_ENTRY, 0);
 
   PublishFdtConfigurationTable ();

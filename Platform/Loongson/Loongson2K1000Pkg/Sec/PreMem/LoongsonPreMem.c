@@ -460,34 +460,48 @@ PreMemInit (
   VOID
   )
 {
+  UINT32  PinMux;
+
   /* Order matters, and it is the factory PMON's order: the UART sits behind
      the APB window that ApbBarConfig() opens, so initialising or printing
      before that writes into an unrouted address and the output is lost.  The
      SPI controller is reachable without the BAR (PMON pokes it first), which
      is why the speedup can come before the BAR. */
   SpiFlashSpeedup ();
-  LoongsonBootLogEvent (BOOTLOG_SEC_SPI, 0);
-
   ApbBarConfig ();
-  LoongsonBootLogEvent (BOOTLOG_SEC_APB, 0);
-
   UartPinMuxInit ();
-  LoongsonBootLogEvent (
-    BOOTLOG_SEC_PINMUX,
-    MmioRead32 (SYSCONF (0x420)) & 0xF
-    );
-
+  PinMux = MmioRead32 (SYSCONF (0x420)) & 0xF;
   WatchdogClose ();
-  LoongsonBootLogEvent (BOOTLOG_SEC_WATCHDOG, 0);
+
+  /* Audible progress, part 1: one beep means the firmware runs and the SoC
+     window is open.  The buzzer needs neither the UART nor the display, so it
+     is the one channel that works on an otherwise silent board. */
+  LoongsonBootBeep (1);
 
   EarlySerialInit ();
-  LoongsonBootLogEvent (BOOTLOG_SEC_UART, 0);
-  EarlyPutString ("\r\nLoongson2K1000LA EDK2 SEC booting... [v9]\r\n");
+  EarlyPutString ("\r\nLoongson2K1000LA EDK2 SEC booting... [v10]\r\n");
 
   PcieEarlyConf ();
-  LoongsonBootLogEvent (BOOTLOG_SEC_PCIE, 0);
 
   EarlyPutString ("SoC early init done\r\n");
+
+  /* Audible progress, part 2: the console is alive. */
+  LoongsonBootBeep (2);
+
+  /*
+   * The UART works now, so record the SEC phase in the flash log.  These are
+   * the boot's first flash programs -- deliberately placed after the beeps and
+   * the banner, so that if programming the NOR while executing from it turns
+   * out to misbehave, the audible and serial evidence is already out.
+   */
+  LoongsonBootLogBoot ();
+  LoongsonBootLogEvent (BOOTLOG_SEC_ENTRY, 0);
+  LoongsonBootLogEvent (BOOTLOG_SEC_SPI, 0);
+  LoongsonBootLogEvent (BOOTLOG_SEC_APB, 0);
+  LoongsonBootLogEvent (BOOTLOG_SEC_PINMUX, PinMux);
+  LoongsonBootLogEvent (BOOTLOG_SEC_WATCHDOG, 0);
+  LoongsonBootLogEvent (BOOTLOG_SEC_UART, 0);
+  LoongsonBootLogEvent (BOOTLOG_SEC_PCIE, 0);
   LoongsonBootLogEvent (BOOTLOG_SEC_SOC_DONE, 0);
 
   return 0;

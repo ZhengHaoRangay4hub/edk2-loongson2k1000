@@ -117,6 +117,10 @@ ASM_PFX(_ModuleEntryPoint):
 	li.d	$a1, 0
 	bl	LoongsonBootLogEvent
 	bl	ClkSettingAsm		/* asm: CPU/DDR/GPU PLLs (PMON port) */
+
+	li.d	$a0, 3			/* audible: clock/PLL bring-up done */
+	bl	LoongsonBootBeep
+
 	li.w	$a0, BOOTLOG_SEC_CLK_DONE
 	li.d	$a1, 0
 	bl	LoongsonBootLogEvent
@@ -126,6 +130,10 @@ ASM_PFX(_ModuleEntryPoint):
 	bl	LoongsonBootLogEvent
 	bl	DdrEntryAsm		/* asm: DDR3 init + leveling (PMON port),
 					   leaves memory size in $s2 */
+
+	li.d	$a0, 4			/* audible: DRAM is up */
+	bl	LoongsonBootBeep
+
 	li.w	$a0, BOOTLOG_SEC_DDR_DONE
 	move	$a1, $s2		/* memory size reported by the DDR code */
 	bl	LoongsonBootLogEvent
@@ -141,6 +149,9 @@ ASM_PFX(_ModuleEntryPoint):
 	/* Publish the device tree for the FDT based library classes.
 	   PostMemInit records the outcome in the boot log itself. */
 	bl	PostMemInit
+
+	li.d	$a0, 5			/* audible: SEC finished, PEI next */
+	bl	LoongsonBootBeep
 
 	/* Load the exception vector base address */
 	li.d	$s0, FixedPcdGet64(PcdLoongArchExceptionVectorBaseAddress)

@@ -233,6 +233,97 @@ LogWrite (
 }
 
 /* ------------------------------------------------------------------ */
+/* Audible progress (buzzer on GPIO39)                                 */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The factory PMON drives the buzzer the same way: GPIO39 is bit 7 of the
+ * upper GPIO word, its direction bit lives at 0x1fe00504 and its output data
+ * at 0x1fe00514.  Toggling the data bit in a software delay loop makes the
+ * tone, so the pitch depends on the loop -- the numbers below land around
+ * 1.5 kHz with a ~20 ms beep, which is clearly audible.
+ */
+#define GPIO_DIR_HI   UNCACHED (0x1fe00504)
+#define GPIO_DATA_HI  UNCACHED (0x1fe00514)
+#define BEEP_BIT      0x80u
+
+#define BEEP_HALF_PERIOD  0x10000
+#define BEEP_HALF_CYCLES  0x40
+#define BEEP_GAP_LOOPS    400
+
+STATIC
+VOID
+BeepDelay (
+  IN UINTN  Loops
+  )
+{
+  volatile UINTN  Index;
+
+  for (Index = 0; Index < Loops; Index++) {
+  }
+}
+
+STATIC
+VOID
+BeepTone (
+  VOID
+  )
+{
+  UINTN  Half;
+
+  for (Half = 0; Half < BEEP_HALF_CYCLES; Half++) {
+    MmioWrite32 (GPIO_DATA_HI, MmioRead32 (GPIO_DATA_HI) ^ BEEP_BIT);
+    BeepDelay (BEEP_HALF_PERIOD);
+  }
+}
+
+STATIC
+VOID
+BeepOff (
+  VOID
+  )
+{
+  MmioWrite32 (GPIO_DATA_HI, MmioRead32 (GPIO_DATA_HI) & ~BEEP_BIT);
+}
+
+VOID
+EFIAPI
+LoongsonBootBeep (
+  IN UINTN  Count
+  )
+{
+  UINTN  Index;
+
+  /* GPIO39 as an output; the factory PMON clears the same bit. */
+  MmioWrite32 (GPIO_DIR_HI, MmioRead32 (GPIO_DIR_HI) & ~BEEP_BIT);
+  BeepOff ();
+
+  for (Index = 0; Index < Count; Index++) {
+    BeepTone ();
+    BeepOff ();
+    BeepDelay (BEEP_GAP_LOOPS * BEEP_HALF_PERIOD);
+  }
+}
+
+VOID
+EFIAPI
+LoongsonBootBeepLong (
+  VOID
+  )
+{
+  UINTN  Half;
+
+  MmioWrite32 (GPIO_DIR_HI, MmioRead32 (GPIO_DIR_HI) & ~BEEP_BIT);
+
+  for (Half = 0; Half < BEEP_HALF_CYCLES * 12; Half++) {
+    MmioWrite32 (GPIO_DATA_HI, MmioRead32 (GPIO_DATA_HI) ^ BEEP_BIT);
+    BeepDelay (BEEP_HALF_PERIOD);
+  }
+
+  BeepOff ();
+}
+
+/* ------------------------------------------------------------------ */
 /* Log API                                                             */
 /* ------------------------------------------------------------------ */
 

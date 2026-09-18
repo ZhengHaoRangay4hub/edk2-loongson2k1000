@@ -66,6 +66,32 @@
 #define BOOTLOG_ERR_HANG       0xE2  /* arg: last stage code before the hang */
 
 /**
+  Sound N short beeps on the board's buzzer (GPIO39, the pin the factory PMON
+  beeps with).
+
+  This is the bring-up channel that needs neither a serial console nor a
+  display: the operator hears how far the firmware got and can count the beeps.
+  Called before the corresponding flash log entry, so a hang inside a flash
+  program still leaves the audible progress behind.
+
+  @param[in]  Count  Number of beeps (1..9 sensible).
+**/
+VOID
+EFIAPI
+LoongsonBootBeep (
+  IN UINTN  Count
+  );
+
+/**
+  One long beep, used for the "reached the boot menu" milestone.
+**/
+VOID
+EFIAPI
+LoongsonBootBeepLong (
+  VOID
+  );
+
+/**
   Start the log for this boot: choose the next free sector, erase the region
   when the sectors have all been used, and write the sector header.  Safe to
   call from SEC; repeats after the first call in the same boot are ignored by
