@@ -16,6 +16,11 @@ import sys
 THEME_LIB = "Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonSetupThemeLib/CustomizedDisplayLib.inf"
 BOOT_MGR_LIB = "Platform/Loongson/Loongson2K1000Pkg/Library/PlatformBootManagerLib/PlatformBootManagerLib.inf"
 LVGL_LIB = "LvglPkg/Library/LvglLib/LvglLib.inf"
+# The board boot manager records bring-up milestones, so the QEMU target
+# needs the same library class instance the board DSC provides.
+BOOT_LOG_LIB = "Platform/Loongson/Loongson2K1000Pkg/Library/LoongsonBootLogLib/LoongsonBootLogLib.inf"
+BOOT_LOG_NULL = ("Platform/Loongson/Loongson2K1000Pkg/Library/"
+                 "LoongsonBootLogLibNull/LoongsonBootLogLibNull.inf")
 #
 # Only the setup centre is built into the firmware: the upstream demo
 # applications (UefiDashboard, LvglDemoApp) ship a crude UI and would show
@@ -109,6 +114,28 @@ def patch_dsc(path):
             'CustomizedDisplayLib             |',
             ['LvglLib                          | ' + LVGL_LIB],
             scope_from='[LibraryClasses')
+
+    #
+    # The board boot manager records bring-up milestones in the 2K1000 SPI NOR.
+    # The virt machine has no such controller, so map the class to the null
+    # instance -- the target keeps the same BDS policy without poking absent
+    # hardware.  Replace any existing mapping so a cached tree that was patched
+    # by an earlier revision is corrected too.
+    #
+    import re as _re
+    text, n = _re.subn(
+        r'(?m)^(\s*)LoongsonBootLogLib\s*\|.*$',
+        r'\1LoongsonBootLogLib               | ' + BOOT_LOG_NULL,
+        text, count=1)
+    if n:
+        log.append("LoongsonBootLogLib -> null instance (no SPI controller on virt)")
+    else:
+        text = ensure_after(
+            text,
+            'LvglLib                          |',
+            ['LoongsonBootLogLib               | ' + BOOT_LOG_NULL],
+            scope_from='[LibraryClasses')
+        log.append("LoongsonBootLogLib -> null instance (inserted)")
 
     # platform BDS policy (graphics-only ConOut, largest text mode, the LVGL
     # setup entry) replaces the upstream light boot manager

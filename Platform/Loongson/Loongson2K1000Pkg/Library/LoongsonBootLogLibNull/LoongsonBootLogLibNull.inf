@@ -1,0 +1,23 @@
+## @file
+#  Null instance of the boot progress log, for targets without the 2K1000 SPI
+#  controller (the QEMU `virt` regression target).
+#
+#  Copyright (c) 2026, Loongson2K1000LA EDK2 port contributors.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+#
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = LoongsonBootLogLibNull
+  FILE_GUID                      = 8B1D4C63-2E77-4A90-B3F5-6C41E9A2D077
+  MODULE_TYPE                    = BASE
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = LoongsonBootLogLib
+
+[Sources]
+  LoongsonBootLogLibNull.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.dec
