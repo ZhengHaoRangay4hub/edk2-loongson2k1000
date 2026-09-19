@@ -92,6 +92,26 @@ LoongsonBootBeepLong (
   );
 
 /**
+  Program one byte high in the flash, as a "the firmware reached here" mark.
+
+  The board has no console and no display before DXE, so the only dependable
+  way to see how far a boot got is to leave a trace in the flash and read it
+  back with a programmer.  The sectors used are erased (0xFF) as the board
+  ships and each mark lands at the start of its own 4 KB block, far above the
+  firmware, so a mark is a lone byte in a field of 0xFF and no image can
+  collide with it.
+
+  @param[in]  SectorOffset  Absolute flash offset to program.
+  @param[in]  Code          Byte to write; 0xFF means "no mark".
+**/
+VOID
+EFIAPI
+LoongsonBootMark (
+  IN UINTN  SectorOffset,
+  IN UINT8  Code
+  );
+
+/**
   Play a rising scale from the slowest delay to the fastest.
 
   Diagnostic, not progress: it exists to find the delay range the buzzer on

@@ -61,9 +61,24 @@
 #define NOR_WREN     0x06
 #define NOR_RDSR     0x05
 #define NOR_PROGRAM  0x02
+#define NOR_ERASE_4K 0x20
 
 #define SPI_CS_ASSERT   0x01
 #define SPI_CS_RELEASE  0x11
+
+/*
+ * The read and write clocks of the controller.  PARAM bit 0 (memory_en) is what
+ * the hardware gates software chip select on: while it is set the controller
+ * serves the boot window and ignores the command engine, which is why a log
+ * that never wrote PARAM never programmed a byte.
+ *
+ * PMON's spi_initw/spi_initr carry exactly these two values, and it can flip
+ * between them at run time because its code is executing from RAM, not from
+ * the flash it is writing -- the boot ROM copies the image into the on-chip
+ * memory at reset.  The same is true here.
+ */
+#define SPI_PARAM_READ   0x17
+#define SPI_PARAM_WRITE  0x10
 
 /* Log geometry: one header record followed by a 4-byte slot per event code. */
 #define LOG_BASE         LS2K_BOOTLOG_BASE
@@ -471,4 +486,79 @@ LoongsonBootLogEvent (
   (VOID)Code;
   (VOID)Arg;
 #endif
+}
+
+/* ------------------------------------------------------------------ */
+/* "I got here" marks in the flash                                     */
+/* ------------------------------------------------------------------ */
+
+/*
+ * This board offers nothing to watch: no serial console, no display before DXE,
+ * and a buzzer whose pitch depends on an instruction-fetch cost that cannot be
+ * worked out from the source.  "Where did it stop?" has therefore been
+ * unanswerable, and every attempt to answer it by ear was a guess.
+ *
+ * A mark answers it by machine: each milestone programs one byte into a sector
+ * high in the chip, so reading the chip with the programmer afterwards shows
+ * how far the firmware got.  Programming turns 0xFF into the code, which is
+ * the direction NOR flash moves on its own -- the sectors used here are erased
+ * (0xFF) as the board ships, so a mark is a lone byte standing out in 4 KB of
+ * 0xFF.  Erasing would have been the wrong direction: an erased sector reads
+ * the same as one that was never touched.
+ *
+ * The write uses PMON's own clock dance: put the controller on its write clock
+ * first, because PARAM bit 0 (memory_en) is what gates software chip select --
+ * with it set the controller serves the boot window and ignores the command
+ * engine, which is exactly why the earlier boot log never programmed a byte.
+ * PMON gets away with flipping this at run time because its code executes from
+ * on-chip memory rather than from the flash it is programming; the same holds
+ * for this image.
+ *
+ * The mark sits far above the firmware, so no image overwrites it and it
+ * survives across boots until the chip is erased.
+ */
+VOID
+EFIAPI
+LoongsonBootMark (
+  IN UINTN  SectorOffset,
+  IN UINT8  Code
+  )
+{
+  UINTN     Spi;
+  UINTN     Spin;
+  volatile  UINTN  Sink;
+
+  Spi = SPI_REG_BASE;
+
+  MmioWrite8 (Spi + SPI_PARAM, SPI_PARAM_WRITE);
+  MmioWrite8 (Spi + SPI_SPSR, 0xc0);
+  MmioWrite8 (Spi + SPI_PARAM2, 0x01);
+  MmioWrite8 (Spi + SPI_SPER, 0x04);
+  MmioWrite8 (Spi + SPI_SPCR, 0x51);
+
+  /* Write enable: the chip ignores a program that is not preceded by it. */
+  MmioWrite8 (Spi + SPI_SOFTCS, SPI_CS_ASSERT);
+  MmioWrite8 (Spi + SPI_FIFO, NOR_WREN);
+  MmioWrite8 (Spi + SPI_SOFTCS, SPI_CS_RELEASE);
+
+  /* Page program, one byte, 24 bit address. */
+  MmioWrite8 (Spi + SPI_SOFTCS, SPI_CS_ASSERT);
+  MmioWrite8 (Spi + SPI_FIFO, NOR_PROGRAM);
+  MmioWrite8 (Spi + SPI_FIFO, (UINT8)(SectorOffset >> 16));
+  MmioWrite8 (Spi + SPI_FIFO, (UINT8)(SectorOffset >> 8));
+  MmioWrite8 (Spi + SPI_FIFO, (UINT8)SectorOffset);
+  MmioWrite8 (Spi + SPI_FIFO, Code);
+  MmioWrite8 (Spi + SPI_SOFTCS, SPI_CS_RELEASE);
+
+  /*
+   * The read clock goes back before the wait, not after: chip select has
+   * already been released and the byte is on its way, so the fetch path can be
+   * restored while the chip spends the next millisecond programming.
+   */
+  MmioWrite8 (Spi + SPI_PARAM, SPI_PARAM_READ);
+
+  Sink = 0;
+  for (Spin = 0; Spin < 0x20000; Spin++) {
+    Sink += Spin;
+  }
 }

@@ -474,6 +474,9 @@ PreMemInit (
 {
   UINT32  PinMux;
 
+  /* Mark 0x3E0000: the C environment was entered and ran this far. */
+  LoongsonBootMark (0x3E0000, 0xa2);
+
   /*
    * Ahead of everything else: a scale to find the pitch this board's buzzer is
    * actually loud at.  It needs only the GPIO block, which PMON also reaches
@@ -509,7 +512,10 @@ PreMemInit (
   LoongsonBootBeep (1);
 
   EarlySerialInit ();
-  EarlyPutString ("\r\nLoongson2K1000LA EDK2 SEC booting... [v10]\r\n");
+  EarlyPutString ("\r\nLoongson2K1000LA EDK2 SEC booting... [v13]\r\n");
+
+  /* Mark 0x3D0000: the UART is up, so APB routing and pin muxing worked. */
+  LoongsonBootMark (0x3D0000, 0xa3);
 
   PcieEarlyConf ();
 

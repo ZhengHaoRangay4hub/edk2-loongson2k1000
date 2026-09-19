@@ -161,6 +161,16 @@ ASM_PFX(_ModuleEntryPoint):
 	li.d	$a1, 0
 	bl	LoongsonBootLogEvent
 
+	/*
+	 * Mark 0x3F0000: the reset path ran, the direct mapping windows work, and
+	 * the controller accepted a command-engine erase.  It is the very first
+	 * durable evidence this board can produce, and it needs no console, no
+	 * display and no ear -- read the chip back and look at the sector.
+	 */
+	li.d	$a0, 0x3F0000
+	li.d	$a1, 0xa1
+	bl	LoongsonBootMark
+
 	bl	PreMemInit		/* C: early UART + SoC early init */
 
 	li.w	$a0, BOOTLOG_SEC_CLK_BEGIN
@@ -171,6 +181,11 @@ ASM_PFX(_ModuleEntryPoint):
 	li.d	$a0, 3			/* audible: clock/PLL bring-up done */
 	bl	LoongsonBootBeep
 
+	/* Mark 0x3C0000: the PLLs took the new settings and execution continued. */
+	li.d	$a0, 0x3C0000
+	li.d	$a1, 0xa4
+	bl	LoongsonBootMark
+
 	li.w	$a0, BOOTLOG_SEC_CLK_DONE
 	li.d	$a1, 0
 	bl	LoongsonBootLogEvent
@@ -180,6 +195,11 @@ ASM_PFX(_ModuleEntryPoint):
 	bl	LoongsonBootLogEvent
 	bl	DdrEntryAsm		/* asm: DDR3 init + leveling (PMON port),
 					   leaves memory size in $s2 */
+
+	/* Mark 0x3B0000: DRAM is up. */
+	li.d	$a0, 0x3B0000
+	li.d	$a1, 0xa5
+	bl	LoongsonBootMark
 
 	li.d	$a0, 4			/* audible: DRAM is up */
 	bl	LoongsonBootBeep
