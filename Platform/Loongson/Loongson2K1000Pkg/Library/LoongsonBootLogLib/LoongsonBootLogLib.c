@@ -78,10 +78,24 @@
    filler), so a slot is unambiguous in both environments. */
 #define LOG_VALUE_MARK   0x5A
 /* Bounded waits: a flash that never answers costs milliseconds, not seconds. */
-#define SPI_POLL_LIMIT  20000
+#define SPI_POLL_LIMIT  2000
 
-/* The window the firmware fetches from -- also the mirror target, see above. */
-#define FLASH_XIP  UNCACHED (LS2K_SPI_NOR_XIP_BASE)
+/*
+ * Flash logging is compiled out of the board build.
+ *
+ * Driving the controller's command engine means writing SPSR/SPCR on a part
+ * whose instruction fetch is being served by that same controller, and it runs
+ * from the first instruction of SEC -- before anything else, including the
+ * buzzer.  Every boot since it was added has been silent, and not one byte of
+ * log has ever been read back off the chip, so it costs boot progress and pays
+ * nothing.  The primitives and the API stay in the tree behind this switch,
+ * ready for the phase that runs from DRAM and can talk to the flash safely.
+ */
+#ifndef BOOTLOG_FLASH_ENABLE
+#define BOOTLOG_FLASH_ENABLE  0
+#endif
+
+#if BOOTLOG_FLASH_ENABLE
 
 /* ------------------------------------------------------------------ */
 /* SPI NOR programming primitives                                      */
@@ -130,19 +144,6 @@ SpiCs (
   )
 {
   MmioWrite8 (SPI_REG_BASE + SPI_SOFTCS, State);
-}
-
-STATIC
-VOID
-SpiInit (
-  VOID
-  )
-{
-  MmioWrite8 (SPI_REG_BASE + SPI_SPSR, 0xc0);
-  MmioWrite8 (SPI_REG_BASE + SPI_PARAM, 0x10);
-  MmioWrite8 (SPI_REG_BASE + SPI_PARAM2, 0x01);
-  MmioWrite8 (SPI_REG_BASE + SPI_SPER, 0x04);
-  MmioWrite8 (SPI_REG_BASE + SPI_SPCR, 0x51);
 }
 
 /**
@@ -221,35 +222,53 @@ LogWrite (
     }
 
     /*
-     * QEMU models the boot window as RAM and treats the controller commands
-     * as no-ops, so this is what makes the log observable in the emulator.
-     * On silicon the same address lands in the local-bus window, which is not
-     * populated on this board, and the store is simply dropped.
+     * No mirror write into the XIP window: the log lives at 0x360000, past the
+     * chip's 1 MB boot window, where a store would go to the local-bus window
+     * instead.  QEMU cannot see the log as a result (its SPI controller model
+     * ignores the program opcodes), but the board is what this is for.
      */
-    *(volatile UINT8 *)(FLASH_XIP + Offset + Index) = Data[Index];
+    (VOID)Offset;
   }
 
   return TRUE;
 }
 
+#else
+
+/* Nothing here runs on the board build; see BOOTLOG_FLASH_ENABLE above. */
+
+#endif
+
 /* ------------------------------------------------------------------ */
 /* Audible progress (buzzer on GPIO39)                                 */
 /* ------------------------------------------------------------------ */
 
-/*
- * The factory PMON drives the buzzer the same way: GPIO39 is bit 7 of the
- * upper GPIO word, its direction bit lives at 0x1fe00504 and its output data
- * at 0x1fe00514.  Toggling the data bit in a software delay loop makes the
- * tone, so the pitch depends on the loop -- the numbers below land around
- * 1.5 kHz with a ~20 ms beep, which is clearly audible.
- */
 #define GPIO_DIR_HI   UNCACHED (0x1fe00504)
 #define GPIO_DATA_HI  UNCACHED (0x1fe00514)
 #define BEEP_BIT      0x80u
 
-#define BEEP_HALF_PERIOD  0x10000
-#define BEEP_HALF_CYCLES  0x40
-#define BEEP_GAP_LOOPS    400
+/*
+ * The factory PMON drives the buzzer the same way: GPIO39 is bit 7 of the
+ * upper GPIO word, its direction bit lives at 0x1fe00504 and its output data
+ * at 0x1fe00514.  Toggling that data bit from a software delay loop makes the
+ * tone, so the pitch is whatever this code's loop timing happens to produce.
+ *
+ * That timing is not knowable from here: SEC executes from the uncached boot
+ * window, where every instruction fetch costs a bus round trip, so the same
+ * delay count lands on a different pitch than it would from cache.  Guessing
+ * the count is what cost two boots: one attempt aimed for ~1.5 kHz and came out
+ * silent.
+ *
+ * So the beep is played as a short chirp that walks four delay values spanning
+ * one octave apart.  Every value in it is one the board has already been heard
+ * to sound at, and between them the tone is bound to be audible whatever the
+ * real loop cost turns out to be.  It warbles and sounds rough -- which is the
+ * "hoarse but clear" the board's owner asked for.
+ */
+#define BEEP_FIRST_PERIOD  0x40  /* the four steps are this shifted by 0..3 */
+#define BEEP_STEP_HALVES   8
+#define BEEP_HALF_CYCLES   0x20  /* 32 half periods: 4 steps, ~0.2 s */
+#define BEEP_GAP_LOOPS     0x4000
 
 STATIC
 VOID
@@ -265,15 +284,26 @@ BeepDelay (
 
 STATIC
 VOID
-BeepTone (
-  VOID
+BeepToneCycles (
+  IN UINTN  Cycles
   )
 {
-  UINTN  Half;
+  UINT32  Value;
+  UINTN   Half;
 
-  for (Half = 0; Half < BEEP_HALF_CYCLES; Half++) {
-    MmioWrite32 (GPIO_DATA_HI, MmioRead32 (GPIO_DATA_HI) ^ BEEP_BIT);
-    BeepDelay (BEEP_HALF_PERIOD);
+  /* The other pins in this word are left exactly as they were found. */
+  Value = MmioRead32 (GPIO_DATA_HI) & ~BEEP_BIT;
+
+  for (Half = 0; Half < Cycles; Half++) {
+    Value ^= BEEP_BIT;
+    MmioWrite32 (GPIO_DATA_HI, Value);
+
+    /*
+     * Shifted rather than looked up in a table: a table would be a load from
+     * this image's read-only data, and the point of the exercise is that the
+     * code and its constants are the only things known to be fetchable here.
+     */
+    BeepDelay ((UINTN)BEEP_FIRST_PERIOD << ((Half / BEEP_STEP_HALVES) & 3));
   }
 }
 
@@ -299,9 +329,9 @@ LoongsonBootBeep (
   BeepOff ();
 
   for (Index = 0; Index < Count; Index++) {
-    BeepTone ();
+    BeepToneCycles (BEEP_HALF_CYCLES);
     BeepOff ();
-    BeepDelay (BEEP_GAP_LOOPS * BEEP_HALF_PERIOD);
+    BeepDelay (BEEP_GAP_LOOPS);
   }
 }
 
@@ -311,15 +341,10 @@ LoongsonBootBeepLong (
   VOID
   )
 {
-  UINTN  Half;
-
+  /* Distinct from any count pattern: three times as long. */
   MmioWrite32 (GPIO_DIR_HI, MmioRead32 (GPIO_DIR_HI) & ~BEEP_BIT);
 
-  for (Half = 0; Half < BEEP_HALF_CYCLES * 12; Half++) {
-    MmioWrite32 (GPIO_DATA_HI, MmioRead32 (GPIO_DATA_HI) ^ BEEP_BIT);
-    BeepDelay (BEEP_HALF_PERIOD);
-  }
-
+  BeepToneCycles (BEEP_HALF_CYCLES * 3);
   BeepOff ();
 }
 
@@ -333,10 +358,27 @@ LoongsonBootLogBoot (
   VOID
   )
 {
+#if BOOTLOG_FLASH_ENABLE
   UINT8  Header[LOG_HDR_SIZE];
   UINTN  Index;
 
-  SpiInit ();
+  /*
+   * Bring up the command engine -- but leave PARAM alone.
+   *
+   * PMON's write setup (spi_initw) also writes PARAM=0x10, which re-clocks the
+   * *read* path; harmless for PMON because it runs from the locked cache, fatal
+   * here because this code executes from the flash itself: the next fetch would
+   * never arrive.  So the engine gets SPSR/SPER/SPCR/PARAM2 and the clock stays
+   * whatever SpiFlashSpeedup() programmed for the XIP read.
+   *
+   * Without these the controller only does XIP reads, the FIFO never reports
+   * ready, and every log write burns its timeout without a byte reaching the
+   * chip -- which is exactly what the empty log looked like.
+   */
+  MmioWrite8 (SPI_REG_BASE + SPI_SPSR, 0xc0);
+  MmioWrite8 (SPI_REG_BASE + SPI_SPER, 0x04);
+  MmioWrite8 (SPI_REG_BASE + SPI_SPCR, 0x51);
+  MmioWrite8 (SPI_REG_BASE + SPI_PARAM2, 0x01);
 
   Header[0] = LOG_MAGIC_0;
   Header[1] = LOG_MAGIC_1;
@@ -348,6 +390,7 @@ LoongsonBootLogBoot (
   }
 
   (VOID)LogWrite (LOG_BASE, Header, LOG_HDR_SIZE);
+#endif
 }
 
 VOID
@@ -357,6 +400,7 @@ LoongsonBootLogEvent (
   IN UINT32  Arg
   )
 {
+#if BOOTLOG_FLASH_ENABLE
   UINT8  Slot[LOG_SLOT_SIZE];
 
   if (Code == 0xFF) {
@@ -379,4 +423,8 @@ LoongsonBootLogEvent (
 
   (VOID)LogWrite (LOG_BASE + LOG_HDR_SIZE + (UINTN)Code * LOG_SLOT_SIZE,
                   Slot, LOG_SLOT_SIZE);
+#else
+  (VOID)Code;
+  (VOID)Arg;
+#endif
 }
