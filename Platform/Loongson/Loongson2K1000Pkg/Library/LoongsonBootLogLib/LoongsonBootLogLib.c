@@ -348,6 +348,50 @@ LoongsonBootBeepLong (
   BeepOff ();
 }
 
+/**
+  Play a rising scale, from the slowest delay to the fastest.
+
+  The pitch of a software square wave is set by how fast this code can toggle
+  the pin, and SEC executes uncached from the boot window, so that cost is not
+  knowable from outside: a single guessed delay already cost two silent boots.
+  A scale answers the question in one power cycle -- whichever step sounds
+  loudest and cleanest names the delay worth using.
+
+  Six steps, each four times faster than the last, so the range spans a factor
+  of a thousand either side of anything guessed so far.  The slowest step takes
+  many times longer than the fastest, which is intentional: the fast ones only
+  need to be present, not beautiful.
+**/
+VOID
+EFIAPI
+LoongsonBootBeepScale (
+  VOID
+  )
+{
+  UINTN   Step;
+  UINTN   Delay;
+  UINTN   Half;
+  UINT32  Value;
+
+  MmioWrite32 (GPIO_DIR_HI, MmioRead32 (GPIO_DIR_HI) & ~BEEP_BIT);
+  Value = MmioRead32 (GPIO_DATA_HI) & ~BEEP_BIT;
+
+  for (Step = 0; Step < 6; Step++) {
+    Delay = (UINTN)0x2000 >> (Step * 2);
+
+    for (Half = 0; Half < 32; Half++) {
+      Value ^= BEEP_BIT;
+      MmioWrite32 (GPIO_DATA_HI, Value);
+      BeepDelay (Delay);
+    }
+
+    /* Long enough to separate one step from the next. */
+    BeepDelay (0x4000);
+  }
+
+  BeepOff ();
+}
+
 /* ------------------------------------------------------------------ */
 /* Log API                                                             */
 /* ------------------------------------------------------------------ */

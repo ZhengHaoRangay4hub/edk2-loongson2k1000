@@ -98,6 +98,56 @@ ASM_PFX(_ModuleEntryPoint):
 	 * then run the pre-memory SoC/PLL/DDR bring-up.
 	 */
 	or	$s0, $zero, $zero	/* memdebug rodata base delta */
+
+	/*
+	 * "The reset path is alive."
+	 *
+	 * Three slow clicks, driven straight from assembly with no stack and no
+	 * calls, before anything in the C environment can fail.  Every audible
+	 * attempt so far went through a C function whose pitch depended on an
+	 * instruction fetch cost that cannot be known from outside -- SEC runs
+	 * uncached from the boot window -- and the board answered with silence,
+	 * which leaves "the buzzer is mistuned" and "nothing ever ran" looking
+	 * exactly alike.
+	 *
+	 * This separates the two.  The clicks are slow enough that a piezo element
+	 * answers with an audible tick whatever the real loop cost is: the high
+	 * time is 0x4000 iterations, milliseconds if an iteration is cheap and a
+	 * second or two if it is not.  Hearing them means the reset path runs,
+	 * GPIO39 still drives the buzzer, and the fault is further down.  Hearing
+	 * nothing means the problem is not the tune.
+	 *
+	 * PMON drives the same pin the same way (BEEP_GPIO 39, direction bit in
+	 * 0x1fe00504, data in 0x1fe00514, bit 7 of the high word) and does it
+	 * before it configures the APB BAR, which is why this can sit here.
+	 */
+	li.d	$t0, 0x900000001fe00500
+	li.w	$t1, 0x80
+	ld.w	$t2, $t0, 4
+	or	$t2, $t2, $t1
+	xor	$t2, $t2, $t1
+	st.w	$t2, $t0, 4		/* GPIO39: the cleared bit means output */
+
+	li.w	$t3, 3
+77:
+	ld.w	$t2, $t0, 0x14
+	or	$t2, $t2, $t1
+	st.w	$t2, $t0, 0x14		/* high */
+	li.w	$t4, 0x4000
+78:
+	addi.w	$t4, $t4, -1
+	bnez	$t4, 78b
+	ld.w	$t2, $t0, 0x14
+	or	$t2, $t2, $t1
+	xor	$t2, $t2, $t1
+	st.w	$t2, $t0, 0x14		/* low */
+	li.w	$t4, 0x8000
+79:
+	addi.w	$t4, $t4, -1
+	bnez	$t4, 79b
+	addi.w	$t3, $t3, -1
+	bnez	$t3, 77b
+
 	li.d	$sp, PREMEM_STACK_TOP
 	addi.d	$sp, $sp, -0x8
 

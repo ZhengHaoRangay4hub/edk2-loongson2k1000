@@ -92,6 +92,20 @@ LoongsonBootBeepLong (
   );
 
 /**
+  Play a rising scale from the slowest delay to the fastest.
+
+  Diagnostic, not progress: it exists to find the delay range the buzzer on
+  this board is actually loud in, which depends on an instruction fetch cost
+  that cannot be worked out from the source.  Run it once and listen, then fix
+  the pitch used by LoongsonBootBeep().
+**/
+VOID
+EFIAPI
+LoongsonBootBeepScale (
+  VOID
+  );
+
+/**
   Start the log for this boot: choose the next free sector, erase the region
   when the sectors have all been used, and write the sector header.  Safe to
   call from SEC; repeats after the first call in the same boot are ignored by

@@ -111,7 +111,8 @@ EarlyPutString (
   )
 {
   while (*String != '\0') {
-    EarlyPutByte (UART0, (UINT8)*String, TRUE);
+    /* Bounded: a UART that never reports ready must not hang the boot. */
+    EarlyPutByte (UART0, (UINT8)*String, FALSE);
     EarlyPutByte (UART0_MIRROR, (UINT8)*String, FALSE);
     String++;
   }
@@ -198,9 +199,20 @@ PciePhyWrite (
   IN UINT32  Value
   )
 {
+  UINT32  Guard;
+
   MmioWrite64 (PCIE_PHY,      (UINT64)Value | 0x100000000ULL);
   MmioWrite64 (PCIE_PHY + 32, (UINT64)Value | 0x100000000ULL);
-  while ((MmioRead32 (PCIE_PHY + 4) & (1 << 2)) == 0) {
+
+  /*
+   * Bounded.  The ported PMON code spins here forever waiting for the PHY's
+   * "done" bit; on this board the bit does not come up, and the firmware sat in
+   * this loop -- after the first beep and before the second, which is exactly
+   * where the board went quiet.  A best-effort PHY write must not be able to
+   * stop the boot.
+   */
+  Guard = 100000;
+  while (((MmioRead32 (PCIE_PHY + 4) & (1 << 2)) == 0) && (--Guard != 0)) {
   }
 }
 
@@ -462,12 +474,30 @@ PreMemInit (
 {
   UINT32  PinMux;
 
+  /*
+   * Ahead of everything else: a scale to find the pitch this board's buzzer is
+   * actually loud at.  It needs only the GPIO block, which PMON also reaches
+   * before it configures the APB BAR, so nothing has to have succeeded first.
+   */
+  LoongsonBootBeepScale ();
+
   /* Order matters, and it is the factory PMON's order: the UART sits behind
      the APB window that ApbBarConfig() opens, so initialising or printing
      before that writes into an unrouted address and the output is lost.  The
      SPI controller is reachable without the BAR (PMON pokes it first), which
      is why the speedup can come before the BAR. */
   SpiFlashSpeedup ();
+
+  /*
+   * Record progress before anything that could hang.  The flash log is the one
+   * channel that survives a board with no serial console and a buzzer too slow
+   * to hear, and it goes through the SPI command engine -- which needs no APB
+   * window, so it can run first.
+   */
+  LoongsonBootLogBoot ();
+  LoongsonBootLogEvent (BOOTLOG_SEC_ENTRY, 0);
+  LoongsonBootLogEvent (BOOTLOG_SEC_SPI, 0);
+
   ApbBarConfig ();
   UartPinMuxInit ();
   PinMux = MmioRead32 (SYSCONF (0x420)) & 0xF;
@@ -488,15 +518,7 @@ PreMemInit (
   /* Audible progress, part 2: the console is alive. */
   LoongsonBootBeep (2);
 
-  /*
-   * The UART works now, so record the SEC phase in the flash log.  These are
-   * the boot's first flash programs -- deliberately placed after the beeps and
-   * the banner, so that if programming the NOR while executing from it turns
-   * out to misbehave, the audible and serial evidence is already out.
-   */
-  LoongsonBootLogBoot ();
-  LoongsonBootLogEvent (BOOTLOG_SEC_ENTRY, 0);
-  LoongsonBootLogEvent (BOOTLOG_SEC_SPI, 0);
+  /* The rest of the SEC phase lands in the log as it happens. */
   LoongsonBootLogEvent (BOOTLOG_SEC_APB, 0);
   LoongsonBootLogEvent (BOOTLOG_SEC_PINMUX, PinMux);
   LoongsonBootLogEvent (BOOTLOG_SEC_WATCHDOG, 0);

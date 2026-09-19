@@ -106,7 +106,9 @@ INF  MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
 INF  MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
 INF  FatPkg/EnhancedFatDxe/Fat.inf
 !if $(QEMU_FIT) == FALSE
+!if $(BOARD_MIN) == FALSE
 INF  MdeModulePkg/Universal/Disk/UdfDxe/UdfDxe.inf
+!endif
 !endif
 
 #
@@ -128,7 +130,14 @@ INF  MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
 #
 INF  Platform/Loongson/Loongson2K1000Pkg/LoongsonDisplayDxe/LoongsonDisplayDxe.inf
 !if $(QEMU_FIT) == FALSE
+#
+# The display driver paints the boot logo itself, so LogoDxe is dead weight --
+# and at 1.6 MB it is the single largest module in the image.  Dropped in the
+# size-constrained build.
+#
+!if $(BOARD_MIN) == FALSE
 INF  MdeModulePkg/Logo/LogoDxe.inf
+!endif
 INF  Platform/Loongson/Loongson2K1000Pkg/LoongsonOverclockDxe/LoongsonOverclockDxe.inf
 INF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
 INF  LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf

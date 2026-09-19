@@ -14,6 +14,16 @@ DEFINE BLOCK_SIZE                 = 0x1000
 !endif
 
 #
+# BOARD_MIN: cut the image down so that everything fits inside the chip's 1 MB
+# boot window.  The 2K1000LA maps only 0x1C000000-0x1C0FFFFF to the boot device
+# (manual section 6.1); anything the firmware must execute or read as memory has
+# to live in that first megabyte, and this board's full-feature image is 1.4 MB.
+#
+!ifndef BOARD_MIN
+  DEFINE BOARD_MIN                 = FALSE
+!endif
+
+#
 # Pre-DRAM stack top used by Sec/LoongArch64/Start.S.  The board default sits at
 # the top of the writable 256 KB window the boot ROM maps over the front of the
 # SPI NOR image.  QEMU's ls2k machine maps that window as read-only ROM, so the
@@ -40,7 +50,16 @@ DEFINE FW_SIZE                    = 0x400000
 #   0x3B0000..0x3C0000  FTW working block
 #   0x3C0000..0x400000  FTW spare block
 #
-DEFINE FVMAIN_SIZE                = 0x360000
+#
+# The firmware volume has to declare a length that fits inside the chip's 1 MB
+# boot window -- anything past it reads back as local-bus data, which the FV
+# parser would walk into.  BOARD_MIN keeps the whole volume below the window.
+#
+!if $(BOARD_MIN) == TRUE
+  DEFINE FVMAIN_SIZE              = 0xF0000
+!else
+  DEFINE FVMAIN_SIZE              = 0x360000
+!endif
 
 #Set Memory layout (inside the 2MB firmware-reserve area of low RAM)
 DEFINE SEC_PEI_TEMP_RAM_BASE      = 0x10000

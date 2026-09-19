@@ -54,7 +54,29 @@
   # reaches either of those two steps - which is why the override silently had
   # no effect on the stack constant until it was moved here.
   #
-  GCC:*_*_*_PP_FLAGS = -D PREMEM_STACK_TOP=$(PREMEM_STACK_TOP)
+  #
+  # DDR configuration word for the memory controller, taken from the factory
+  # PMON binary for this board: its `li.d $s1, ...` at flash offset 0x1648
+  # loads 0xc0a18404, while the ported assembly's fallback (and the generic
+  # PMON source default) is 0xf0a31004.  With the wrong word the DDR3 init
+  # hangs, which is exactly where the board stopped (three beeps, never four).
+  #
+  #
+  # DDR bring-up values for this board, read out of the factory PMON image
+  # rather than guessed: a byte-level diff of the DDR3 parameter table between
+  # that binary and our build shows these six knobs differ, and every one of
+  # them is a per-board DRAM setting (DLL, ODT, drive strength, reset pad).
+  # With any of them wrong the DDR init hangs, which is where the board stopped
+  # (three beeps, never four).
+  #
+  #   $s1                 0xc0a18404            (li.d $s1 at flash 0x1648)
+  #   DDR_PARAM_018       0x3030303016100000    (table entry 3)
+  #   DDR_PARAM_140       0x00030000010f01ff    (entry 40)
+  #   LS2K_STR                                  (clears bit 48 of entry 42)
+  #   entries 56 and 62 are set directly in loongson_mc2_param.S -- their
+  #   macros ignore a -D override on this branch.
+  #
+  GCC:*_*_*_PP_FLAGS = -D PREMEM_STACK_TOP=$(PREMEM_STACK_TOP) -D DDR_S1=0xc0a18404 -D DDR_PARAM_018=0x3030303016100000 -D DDR_PARAM_140=0x00030000010f01ff -D LS2K_STR
 
 [BuildOptions.LOONGARCH64.EDKII.SEC]
   *_*_*_CC_FLAGS                 =

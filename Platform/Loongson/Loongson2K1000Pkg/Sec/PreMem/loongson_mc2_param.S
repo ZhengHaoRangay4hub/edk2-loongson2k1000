@@ -54,7 +54,7 @@ ddr2_RDIMM_reg_data_mc1:
 #elif defined(CONFIG_DDR_16BIT)
 #define _DDR_PARAM_1c0(x) 0x3030c80c03042003
 #define _DDR_PARAM_1f0(x) 0x000801e4ff030101
-#define _DDR_PARAM_210(x) 0x0008010d00030006
+#define _DDR_PARAM_210(x) 0x0008010e00030006
 #define DEFULT_DDR_PARAM_140 0x00030000010301ff
 #else
 //#define _DDR_PARAM_1f0(x) 0x000801e4ff000101
@@ -219,7 +219,9 @@ MC0_DDR3_CTRL_0x1b0: .dword 0x0000001000060d30
 MC0_DDR3_CTRL_0x1b8: .dword 0x0000001000060d30
 //_00000000_00000000 pm_mr_3_cs_3 _00000000_00000000 pm_mr_2_cs_3 _00000000_00000000 pm_mr_1_cs_3 _00000000_00000000 pm_mr_0_cs_3
 //MC0_DDR3_CTRL_0x1c0: .dword 0x3030c80c03042005
-MC0_DDR3_CTRL_0x1c0: .dword DDR_PARAM(1c0,0x3030c80c03042005)
+// Set from the factory PMON image: its DDR3 table holds 0x3030c80c03042003
+// here.  The source default (0x...05) is a different DRAM's drive strength.
+MC0_DDR3_CTRL_0x1c0: .dword DDR_PARAM(1c0,0x3030c80c03042003)
 //_00000000 pm_tRESET _00000000 pm_tCKE _00000000 pm_tXPR _00000000 pm_tMOD _00000000 pm_tZQCL _00000000 pm_tZQ_CMD _00000000 pm_tWLDQSEN 000_00000 pm_tRDDATA
 MC0_DDR3_CTRL_0x1c8: .dword 0x11070707154a4080
 //MC0_DDR3_CTRL_0x1c8: .dword 0x130a090910504080
@@ -235,7 +237,9 @@ MC0_DDR3_CTRL_0x1e0: .dword DDR_PARAM(1e0, 0x0503000000000000)
 MC0_DDR3_CTRL_0x1e8: .dword DDR_PARAM(1e8, 0x0309000000000000) 
 //00_000000 pm_tR2R_diffcs_adj_dly 00_000000 pm_tR2W_diffcs_dly 00_000000 pm_tR2P_samecs_dly 00_000000 pm_tW2P_samecs_dly 00_000000 pm_tR2R_samecs_adj_dly 00_000000 pm_tR2W_samecs_adj_dly 00_000000 pm_tW2R_samecs_adj_dly 00_000000 pm_tW2W_samecs_adj_dly
 //MC0_DDR3_CTRL_0x1f0: .dword 0x000801e4ff000101
-MC0_DDR3_CTRL_0x1f0: .dword DDR_PARAM(1f0, 0x000801e4ff000101)
+// Factory value: 0x000801e4ff050101 (the ported default 0x...ff000101 is a
+// different ODT/DLL setting).
+MC0_DDR3_CTRL_0x1f0: .dword DDR_PARAM(1f0, 0x000801e4ff050101)
 //0000_0000 pm_power_up _00000000 pm_age_step _00000000 pm_tCPDED _00000000 pm_cs_map _00000000 pm_bs_config 00000_000 pm_channel_32 pm_channel_16 pm_nc 0000_0000 pm_pr_r2w 0000000_0 pm_placement_en
 MC0_DDR3_CTRL_0x1f8: .dword 0x0000000004081001
 //0000_0000 pm_hardware_pd_3 0000_0000 pm_hardware_pd_2 0000_0000 pm_hardware_pd_1 0000_0000 pm_hardware_pd_0 00_000000 pm_credit_16 00_000000 pm_credit_32 00_000000 pm_credit_64 0000000_0 pm_selection_en
@@ -244,7 +248,8 @@ MC0_DDR3_CTRL_0x200: .dword 0x0c000c000c000c00
 MC0_DDR3_CTRL_0x208: .dword 0x0c000c0000000000
 //0000_0000_00000000 pm_wrfifo_age 0000_0000_00000000 pm_rdfifo_age 0000_0000 pm_power_status_3 0000_0000 pm_power_status_2 0000_0000 pm_power_status_1 0000_0000 pm_power_status_0
 //MC0_DDR3_CTRL_0x210: .dword 0x0008010f00030006
-MC0_DDR3_CTRL_0x210: .dword DDR_PARAM(210, 0x0008010f00030006)
+// Factory value: 0x0008010e00030006.
+MC0_DDR3_CTRL_0x210: .dword DDR_PARAM(210, 0x0008010e00030006)
 //_00000000_00000000 pm_active_age 0000000_0 pm_cs_place_0 0000_0000 pm_addr_win_0 000000_00 pm_cs_diff_0 00000_000 pm_row_diff_0 000000_00 pm_ba_diff_0 00000_000 pm_col_diff_0
 MC0_DDR3_CTRL_0x218: .dword 0x0008000b00030106
 //_00000000_00000000 pm_fastpd_age 0000000_0 pm_cs_place_1 0000_0000 pm_addr_win_1 000000_00 pm_cs_diff_1 00000_000 pm_row_diff_1 000000_00 pm_ba_diff_1 00000_000 pm_col_diff_1
@@ -347,7 +352,8 @@ MC0_DDR3_RDIMM_CTRL_0x010: .dword 0x0000000000000000
 //XXXX pm_dll_value_8(RD) XXXX pm_dll_value_7 (RD) XXXX pm_dll_value_6(RD) XXXX pm_dll_value_5(RD)
 //MC0_DDR3_RDIMM_CTRL_0x018: .dword 0x5252525216100000
 //MC0_DDR3_RDIMM_CTRL_0x018: .dword 0x4040404016100000
-MC0_DDR3_RDIMM_CTRL_0x018: .dword 0x4545454516100000
+// Factory value (see the DDR3 table above).
+MC0_DDR3_RDIMM_CTRL_0x018: .dword 0x3030303016100000
 //MC0_DDR3_RDIMM_CTRL_0x018: .dword 0x2525252516100000
 //_00000000 pm_dll_ck_3 _00000000 pm_dll_ck_2 _00000000 pm_dll_ck_1 _00000000 pm_dll_ck_0 _00000000 pm_dll_increment _00000000 pm_dll_start_point _0000000_0 pm_dll_bypass _0000000_0 pm_init_start
 MC0_DDR3_RDIMM_CTRL_0x020: .dword 0x0201000201000000
@@ -480,7 +486,7 @@ MC0_DDR3_RDIMM_CTRL_0x200: .dword 0x0c000c000c000c00
 //0000_0000_00000000 pm_cmdq_age_16 0000_0000_00000000 pm_cmdq_age_32 0000_0000_00000000 pm_cmdq_age_64 _00000000 pm_tCKESR _00000000 pm_tRDPDEN
 MC0_DDR3_RDIMM_CTRL_0x208: .dword 0x0c000c0000000000
 //0000_0000_00000000 pm_wrfifo_age 0000_0000_00000000 pm_rdfifo_age 0000_0000 pm_power_status_3 0000_0000 pm_power_status_2 0000_0000 pm_power_status_1 0000_0000 pm_power_status_0
-MC0_DDR3_RDIMM_CTRL_0x210: .dword 0x0008010f00030006
+MC0_DDR3_RDIMM_CTRL_0x210: .dword 0x0008010f00030006   // factory keeps 0x0f in this table
 //_00000000_00000000 pm_active_age 0000000_0 pm_cs_place_0 0000_0000 pm_addr_win_0 000000_00 pm_cs_diff_0 00000_000 pm_row_diff_0 000000_00 pm_ba_diff_0 00000_000 pm_col_diff_0
 MC0_DDR3_RDIMM_CTRL_0x218: .dword 0x0008000b00030106
 //_00000000_00000000 pm_fastpd_age 0000000_0 pm_cs_place_1 0000_0000 pm_addr_win_1 000000_00 pm_cs_diff_1 00000_000 pm_row_diff_1 000000_00 pm_ba_diff_1 00000_000 pm_col_diff_1
