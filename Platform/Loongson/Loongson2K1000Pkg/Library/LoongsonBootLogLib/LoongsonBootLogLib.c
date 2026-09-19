@@ -493,6 +493,122 @@ LoongsonBootLogEvent (
 /* ------------------------------------------------------------------ */
 
 /*
+ * The primitives below follow PMON's spi_w.c byte for byte, because getting
+ * them subtly wrong is invisible: a controller that refuses the command, or a
+ * chip whose block protection is still set, both leave the flash exactly as it
+ * was -- indistinguishable from firmware that never ran.
+ */
+
+/**
+  Send one byte and wait for it to leave the FIFO.  PMON's send_spi_cmd does
+  this for every byte; skipping the wait drops bytes on the floor.
+**/
+STATIC
+UINT8
+BootMarkSend (
+  IN UINTN  Spi,
+  IN UINT8  Value
+  )
+{
+  UINT32  Timeout;
+
+  MmioWrite8 (Spi + SPI_FIFO, Value);
+
+  Timeout = 100000;
+  while (((MmioRead8 (Spi + SPI_SPSR)) & SPI_RFEMPTY) != 0) {
+    if (Timeout-- == 0) {
+      break;
+    }
+  }
+
+  return MmioRead8 (Spi + SPI_FIFO);
+}
+
+STATIC
+VOID
+BootMarkCs (
+  IN UINTN  Spi,
+  IN UINT8  State
+  )
+{
+  MmioWrite8 (Spi + SPI_SOFTCS, State);
+}
+
+/** Read the status register (0x05), PMON's read_sr. */
+STATIC
+UINT8
+BootMarkReadSr (
+  IN UINTN  Spi
+  )
+{
+  UINT8  Value;
+
+  BootMarkCs (Spi, SPI_CS_ASSERT);
+  BootMarkSend (Spi, NOR_RDSR);
+  Value = BootMarkSend (Spi, 0x00);
+  BootMarkCs (Spi, SPI_CS_RELEASE);
+
+  return Value;
+}
+
+/** Wait out the chip's busy bit, with a bound so a dead chip cannot hang boot. */
+STATIC
+VOID
+BootMarkWaitBusy (
+  IN UINTN  Spi
+  )
+{
+  UINT32  Timeout;
+
+  Timeout = 1000000;
+  while (((BootMarkReadSr (Spi) & 0x01) != 0) && (Timeout-- != 0)) {
+  }
+}
+
+/** Write enable: 0x06, PMON's set_wren. */
+STATIC
+VOID
+BootMarkWren (
+  IN UINTN  Spi
+  )
+{
+  BootMarkWaitBusy (Spi);
+
+  BootMarkCs (Spi, SPI_CS_ASSERT);
+  BootMarkSend (Spi, NOR_WREN);
+  BootMarkCs (Spi, SPI_CS_RELEASE);
+}
+
+/**
+  Clear every block-protection bit in the status register.
+
+  This is the step that decides whether anything else works.  A chip with BP0-3,
+  TB, SEC or SRP set answers a sector erase or a page program by ignoring it and
+  reporting success on the bus, so the firmware's marks would never appear and
+  the board would look exactly like one that never ran.  PMON writes the status
+  register to zero before every erase and every program for the same reason.
+**/
+STATIC
+VOID
+BootMarkUnprotect (
+  IN UINTN  Spi
+  )
+{
+  BootMarkWren (Spi);
+
+  /* Enable-Write-Status-Register (0x50), PMON's en_write_sr. */
+  BootMarkCs (Spi, SPI_CS_ASSERT);
+  BootMarkSend (Spi, 0x50);
+  BootMarkCs (Spi, SPI_CS_RELEASE);
+
+  /* Write status register (0x01), PMON's write_sr. */
+  BootMarkCs (Spi, SPI_CS_ASSERT);
+  BootMarkSend (Spi, 0x01);
+  BootMarkSend (Spi, 0x00);
+  BootMarkCs (Spi, SPI_CS_RELEASE);
+}
+
+/*
  * This board offers nothing to watch: no serial console, no display before DXE,
  * and a buzzer whose pitch depends on an instruction-fetch cost that cannot be
  * worked out from the source.  "Where did it stop?" has therefore been
@@ -509,10 +625,9 @@ LoongsonBootLogEvent (
  * The write uses PMON's own clock dance: put the controller on its write clock
  * first, because PARAM bit 0 (memory_en) is what gates software chip select --
  * with it set the controller serves the boot window and ignores the command
- * engine, which is exactly why the earlier boot log never programmed a byte.
- * PMON gets away with flipping this at run time because its code executes from
- * on-chip memory rather than from the flash it is programming; the same holds
- * for this image.
+ * engine.  PMON gets away with flipping this at run time because its code
+ * executes from on-chip memory rather than from the flash it is programming;
+ * the same holds for this image.
  *
  * The mark sits far above the firmware, so no image overwrites it and it
  * survives across boots until the chip is erased.
@@ -524,41 +639,53 @@ LoongsonBootMark (
   IN UINT8  Code
   )
 {
-  UINTN     Spi;
-  UINTN     Spin;
-  volatile  UINTN  Sink;
+  UINTN  Spi;
 
   Spi = SPI_REG_BASE;
 
+  /* All chip selects high, then the write clock (PMON's spi_initw). */
+  MmioWrite8 (Spi + SPI_SOFTCS, 0xff);
   MmioWrite8 (Spi + SPI_PARAM, SPI_PARAM_WRITE);
   MmioWrite8 (Spi + SPI_SPSR, 0xc0);
   MmioWrite8 (Spi + SPI_PARAM2, 0x01);
   MmioWrite8 (Spi + SPI_SPER, 0x04);
   MmioWrite8 (Spi + SPI_SPCR, 0x51);
 
-  /* Write enable: the chip ignores a program that is not preceded by it. */
-  MmioWrite8 (Spi + SPI_SOFTCS, SPI_CS_ASSERT);
-  MmioWrite8 (Spi + SPI_FIFO, NOR_WREN);
-  MmioWrite8 (Spi + SPI_SOFTCS, SPI_CS_RELEASE);
-
-  /* Page program, one byte, 24 bit address. */
-  MmioWrite8 (Spi + SPI_SOFTCS, SPI_CS_ASSERT);
-  MmioWrite8 (Spi + SPI_FIFO, NOR_PROGRAM);
-  MmioWrite8 (Spi + SPI_FIFO, (UINT8)(SectorOffset >> 16));
-  MmioWrite8 (Spi + SPI_FIFO, (UINT8)(SectorOffset >> 8));
-  MmioWrite8 (Spi + SPI_FIFO, (UINT8)SectorOffset);
-  MmioWrite8 (Spi + SPI_FIFO, Code);
-  MmioWrite8 (Spi + SPI_SOFTCS, SPI_CS_RELEASE);
+  BootMarkUnprotect (Spi);
 
   /*
-   * The read clock goes back before the wait, not after: chip select has
-   * already been released and the byte is on its way, so the fetch path can be
-   * restored while the chip spends the next millisecond programming.
+   * Erase the sector before programming into it.
+   *
+   * A sector that is already 0xFF cannot show whether an erase command ever
+   * arrived -- erasing it is a no-op either way.  So the field below is
+   * pre-loaded with 0x00 by the programmer, and this erase turns it to 0xFF:
+   * a sector still reading 0x00 means the firmware never got here, a sector
+   * reading 0xFF means it got here and the controller accepted commands, and
+   * the code byte appearing means the program step works too.  Without the
+   * erase there is no way to tell "never ran" from "ran but could not write".
    */
-  MmioWrite8 (Spi + SPI_PARAM, SPI_PARAM_READ);
+  BootMarkWren (Spi);
+  BootMarkCs (Spi, SPI_CS_ASSERT);
+  BootMarkSend (Spi, NOR_ERASE_4K);
+  BootMarkSend (Spi, (UINT8)(SectorOffset >> 16));
+  BootMarkSend (Spi, (UINT8)(SectorOffset >> 8));
+  BootMarkSend (Spi, (UINT8)SectorOffset);
+  BootMarkCs (Spi, SPI_CS_RELEASE);
+  BootMarkWaitBusy (Spi);
 
-  Sink = 0;
-  for (Spin = 0; Spin < 0x20000; Spin++) {
-    Sink += Spin;
-  }
+  BootMarkWren (Spi);
+
+  /* Page program, one byte, 24 bit address. */
+  BootMarkCs (Spi, SPI_CS_ASSERT);
+  BootMarkSend (Spi, NOR_PROGRAM);
+  BootMarkSend (Spi, (UINT8)(SectorOffset >> 16));
+  BootMarkSend (Spi, (UINT8)(SectorOffset >> 8));
+  BootMarkSend (Spi, (UINT8)SectorOffset);
+  BootMarkSend (Spi, Code);
+  BootMarkCs (Spi, SPI_CS_RELEASE);
+
+  BootMarkWaitBusy (Spi);
+
+  /* Back to the read clock so the next fetch is served again. */
+  MmioWrite8 (Spi + SPI_PARAM, SPI_PARAM_READ);
 }
