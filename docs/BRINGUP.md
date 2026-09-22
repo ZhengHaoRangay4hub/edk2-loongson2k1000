@@ -19,7 +19,7 @@
 | | QEMU | 真机（教育派） |
 |---|---|---|
 | 串口定位 | FDT（QEMU 生成的设备树） | 无 FDT 可用（见 v2） |
-| 地址映射 | 加载器映射整个地址空间 | 启动 ROM 只映射 NOR 前 256KB（见 v6） |
+| 地址映射 | 加载器映射整个地址空间 | 启动窗口 `0x1c000000` 起 1 MB（手册表 6-1 印刷 p.65；§10.2 p.103 原文：整段是 SPI Flash 的**只读 memory 空间**），镜像在此 XIP 取指。**「启动 ROM 只把 NOR 前 256KB 拷进片上 SRAM」是错的**（2026-09-19 更正：手册无此划分，PMON 的早期栈实测在 PA `0x90040000`）|
 | UART 实例 | 只有一个 virtio/16550 | 12 个 UART，引脚复用决定哪些活着（见 v5/v6） |
 
 ---
@@ -83,8 +83,10 @@ UART0（`0x1fe20000`，时钟 125MHz，分频 68 = `125M/(16×115200)`），不�
 2. **SPI 读时钟分频**：出厂二进制写 `0x27`；我们写的 `0x17` 只是 PMON 源码里
    `BOOT_SPI_FREQ` 未定义时的默认值。
 
-另发现 PMON 从不直接在 NOR 上执行：`start.S` 把自身代码拷进 **256KB 锁定缓存**
-（`LOCK_CACHE_SIZE = 0x40000`）再跳进去。当时未意识到这是伏笔（→ v6）。
+另发现 PMON 会把 `.data/.bss` 拷进 **256KB 锁定缓存**（`LOCK_CACHE_SIZE = 0x40000`）。
+**2026-09-19 更正**：那次拷贝搬的是数据、不是控制流——出厂二进制里 `start.S:507-523` 编出来的
+跳转目标是 `PHYS_TO_CACHED(flash 地址)`（dump 反汇编 `0x1c005a0c-0x1c005a2c`），所以 PMON 仍然
+**从 flash 取指**。「PMON 从片上 RAM 执行所以能边写 flash」这句话（v13 节引用过）**不成立**。
 
 ---
 
@@ -130,7 +132,7 @@ DTB 增加 `uart3` 节点、`stdout-path` 指向 TTL 口。
 ### 根因一（结构性，v1 起就存在）：SEC 开分页却无页表
 
 - `CRMD=0xb0` → PG=1、DA=0（分页翻译）；
-- 真机启动 ROM 只把 NOR **前 256KB** 拷进片上 SRAM 并映射；
+- **复位循环的根因是 `CRMD=0xb0`（DA=0、PG=1）且没有页表**：写完 CRMD 后的第一条取指就走 TLB → 异常 → `EBASE` 未设 → 跳飞 → 外部看门狗复位 → 循环（2026-09-19 更正）。「启动 ROM 只映射前 256KB」无手册依据、是臆造（10 号 §7.2）。下面那张 FFS 解析表保留——它证明的是「压缩 DXEFV/DTB/PEI 临时栈都在低 1 MB 之外」，**不是**「256KB 之外不可执行」；
 - 固件卷布局（对 v6 产物解析 FFS 得到）：
 
   | 文件 | 偏移 | 说明 |
@@ -143,8 +145,9 @@ DTB 增加 `uart3` 节点、`stdout-path` 指向 TTL 口。
 
 - 第一次越界访问 → **TLB 异常** → EBASE 尚未设置 → 跳到垃圾地址 → 外部看门狗复位 → 循环。
   QEMU 无此问题因为其加载器映射了整个地址空间。
-- 伏笔的印证：PMON 的 `start.S` 明写 "copy flash code to scache"（拷进 256KB 锁定缓存
-  再跳进去），配合 `LOCK_CACHE_SIZE = 0x40000`——它从不依赖 256KB 之外的取指映射。
+- **删掉「伏笔」这一条**：PMON 往锁定缓存里拷的是数据段，控制流走 flash 的 cached 别名
+  （见「逆向原厂 PMON」节的更正与 09 号 §2.2），所以「PMON 从不依赖 256KB 之外的取指映射」
+  **不成立**；出厂镜像 1 MB 以上全为 `0xFF` 也只是擦除态，不能当映射范围的证据
 
 **修改**：`CRMD` `0xb0` → `0xb8`（**DA=1 直接寻址**，优先级高于 PG）。SEC 全阶段
 直接物理访问、不查 TLB；后续阶段照常建页表。已在产物中反汇编核实
@@ -242,9 +245,10 @@ Shell>
 同一镜像在 `QMEM=2048` 与 `QMEM=1024` 下都到达 `Shell>`（变量区在 `0x0F000000`，
 两种内存下都在低窗口中）。
 
-**这条路径覆盖不到什么**（别误读结论）：**出厂** 3.1 QEMU 的 `ls2k` 不建模
-DC / SII9022A / I2C，**HDMI 通路（P5）在那里无法验证**；它证明的是
-「SEC → PEI → DXE → BDS → 控制台 → Shell」这条软件链路在真实固件镜像上成立。
+**这条路径覆盖不到什么**（别误读结论）：**出厂** 3.1 QEMU 的 `ls2k` 不建模 DC / SII9022A / I2C，
+所以那一次闭环**只**证明了「SEC → PEI → DXE → BDS → 控制台 → Shell」这条软件链路成立。
+**2026-09-17 更新**：8.2 移植版已补建模 SII9022A（I2C1@0x39）与 DC 平面窗口，HDMI 通路在
+那里已能验证（screendump 非黑 100%），见 [QEMU-PORT.md](QEMU-PORT.md) §3.4 与 QEMU-PORT.md:314-316 的待办。
 
 > 后续进展（2026-09-16 深夜）：正在把 `ls2k` 机器移植到 **QEMU 8.2**（`foxsen/qemu-up`
 > 的 `ls2k1000` 分支）并**补建模缺失外设**——`hw/display/sii9022.c`（SII9022A HDMI
@@ -273,8 +277,21 @@ DC / SII9022A / I2C，**HDMI 通路（P5）在那里无法验证**；它证明�
 
 ```bash
 cd ~/Downloads/CH341A
-./flash_v6.sh        # 备份→复读校验→写入→整片回读比对，全自动
+./flash_beep3.sh <镜像.fd>   # 先读前 1MB → 写 → 回读，按 len(镜像) 截断比对（唯一正确的比对）
 ```
+
+**校验规则（唯一可引用的写法）**：把回读文件**截断到镜像长度**再逐字节比（`flash_beep3.sh:42-54`）——
+flashrom 的布局读（`-l 布局 -i 区域`）返回的是**整片 4 MB** 文件、且区域外一律填 `0x00`。
+
+- ❌ **不要引用 `flash_1m.sh` 的比对**：它拿 `read(0x100000)` 跟 `read(0x100000)` 比，镜像是
+  983,040 B、回读是 4,194,304 B（`read` 返回 1,048,576 B），**长度必然不等 ⇒ 永远打印「不一致 ✗」**。
+  我用真实文件复现（照抄 `flash_1m.sh` 旧比对）：`uefi_mark3.fd` vs `post_1m_20260919_211447.bin`
+  → `len(img)=983040 len(got)=1048576 verdict=不一致`。该脚本已按 `flash_beep3.sh` 的写法修正。
+- ❌ 也不要用布局读判断「1 MB 以上没被写」：那 3 MB 的 `0x00` 是填充值不是芯片内容
+  （出厂 dump 与 21:01 的无布局整片读里该区都是 `0xFF`）。
+- 1 MB 以上的判读只能看**无布局整片读**（`read_and_check.sh`）。实测
+  `readback_marks_20260919_211728.bin`：`0x360000-0x370000`、`0x100000-0x360000` 全 `0xFF`，
+  `0x3B0000-0x3FFFFF` 全 `0x00`。
 
 ## 下一步（若 v6 仍有问题）
 
@@ -390,7 +407,7 @@ v11 据此把蜂鸣声做成**扫频**：半周期按 `0x40 → 0x80 → 0x100 �
 |---|---|
 | 真机固件卷 | `~/Downloads/CH341A/uefi_beep3.fd`，983,040 B（0xF0000，1MB 窗口内） |
 | **MD5** | `3373086bec86d7a5e2a2fc56669397b7` |
-| 构建 | `/root/ls2k.sh build -D QEMU_FIT=TRUE -D BOARD_MIN=TRUE` |
+| 构建 | `/root/ls2k.sh build -D QEMU_FIT=TRUE -D BOARD_MIN=TRUE -D BOOT_CRMD=0xb8`（**本轮新增**：真机必须显式给 `BOOT_CRMD=0xb8`，QEMU 侧不传、默认 `0xa8`；见下文 v16 节）|
 | QEMU 闭环 | 同源码另加 `-D PREMEM_STACK_TOP=0x90040000`，QEMU 8.2 上 18 s 到 `Shell>`、串口 59,588 B、`GOP ready (1024x768-32)`、DC 寄存器 `0x60001240` 有值 ✓ |
 | 烧录脚本 | `~/Downloads/CH341A/flash_beep3.sh <镜像>`（先读→比 MD5→写→回读→比 MD5） |
 
@@ -419,7 +436,7 @@ v11 上机仍然一声都没有。回头把原厂 PMON 的蜂鸣器源码挖出�
 |---|---|---|
 | 半周期计数值 | **`0x2000`（8192 次迭代）** | `0x40`~`0x200`，**小了 32~128 倍** |
 | 延时循环 | `addi.w` + `nop` + `bnez`（紧密三条） | `volatile UINTN` 计数（每次读写栈） |
-| 何时能驱 GPIO | **配 APB BAR 之前**（`beep_on` 在 `locate` 标签后） | 配 BAR 之后（以为必须先配 BAR） |
+| 何时能驱 GPIO | **先开 APB 窗口再敲 GPIO39**（`start.S:125-130` 写 APB BAR → `:302` 才 `beep_on`；出厂镜像同序：`0x1c000058-0x1c000064` 写 BAR，`0x68` 才 `bl watchdog_close`） | 与 PMON 相同：配 BAR 之后（v12 原文「PMON 在配 BAR 之前」是错的，2026-09-19 更正） |
 
 也就是说：**过去每一次调试都是在猜一个从源码根本算不出来的量**（SEC 不带 cache 从 flash
 取指，每次取指一次总线往返）。猜错的表现是"没声音"，而"代码压根没跑到"的表现**也是**
@@ -440,8 +457,10 @@ GPIO39 通、蜂鸣器好，问题在后面；听不到 → 根本不是音调�
 半周期从 `0x2000` 按 4 倍递减到 `0x08`（跨 1000 倍），每档 32 个半周期，档间留空隙。
 **一次上电就能听出这块板的蜂鸣器在哪个频段最响**，然后把它固定成进度声的参数。
 
-它只依赖 GPIO 寄存器块（PMON 在配 BAR 之前就能访问），所以放在 `PreMemInit` 最前面，
-前面不需要任何东西成功。
+它只依赖 GPIO 寄存器块。**但「PMON 在配 BAR 之前就能访问 GPIO」是错的**：PMON 先开 APB 窗口
+（`refs/pmon/Targets/ls2k/ls2k/start.S:125-130`）再响（`:302`），出厂镜像逐字节同序
+（我反汇编核实 `0x1c000058-0x1c000064`）。本轮据此把**同一对写搬进 `Start.S` 的咔哒之前**
+（`ApbBarConfig()` 原地不动，两处幂等；见下文 v16 节），而不是靠「PMON 也没开窗」来论证。
 
 ### 三、镜像与验证
 
@@ -482,33 +501,57 @@ void spi_initw(void) { SPSR=0xc0; PARAM=0x10; PARAM2=0x01; SPER=0x04; SPCR=0x51;
 void spi_initr(void) { PARAM=0x17; }
 ```
 
-**`PARAM` 的 bit0 就是 `memory_en`：置位时控制器只服务启动窗口、完全忽略命令引擎**。
+**`PARAM` 的 bit0 是 `memory_en`：手册把它定义为「SPI flash 读使能，无效时 `csn[0]` 可由软件
+控制」（表 10-8，印刷 p.105），置 0 的后果是「不能从 SPI Flash 中取指」（§10.5.3，p.108）。
+「置位时控制器只服务启动窗口、完全忽略命令引擎」是本仓库自撰的说法，手册里没有**（2026-09-19
+更正，出处就是本段原文；09 号对抗复核 §1）。
 
-- `0x17` = 读模式（memory_en=1，XIP 取指用）
-- `0x10` = 写模式（memory_en=0，软件 CS 才被允许）
+- `0x17` = 读时钟（memory_en=1，XIP 取指用）
+- `0x10` = 写时钟（memory_en=0，`csn[0]` 交给软件）
 
-之前的日志库只写了 `SPSR/SPER/SPCR/PARAM2`，**从来没碰过 `PARAM`** → 命令引擎被门禁挡着 →
-一个字节都发不出去 → 日志区永远是空的。**这也解释了为什么 PMON 能在运行中写 flash：
-它的代码是从片上 RAM 执行的，不是从它正在写的那片 flash 取指**。
+「日志一个字节都写不进去」至少有两种**互斥**解释，当前树里两条都在、都没验证：(a) 没清
+`memory_en`；(b) 只配了 `SPSR/SPER/SPCR/PARAM2`、没配够命令引擎要的寄存器
+（`LoongsonBootLogLib.c:446` 的注释持这一说）。**别把其中任何一条当结论。**
+
+**「PMON 能在运行中写 flash 是因为它的代码从片上 RAM 执行」——错**（2026-09-19 更正）：
+出厂二进制把 `.data/.bss` 拷进锁定缓存，控制流却跳 `PHYS_TO_CACHED(flash 地址)`
+（09 号 §2.2）。它凭什么不死目前只有三个**未证实**的候选（09 号 §2.2(d)），
+不要拿这个类比给我们的代码背书。
 
 ### 三、`LoongsonBootMark()`：每过一个阶段往 flash 编一个字节
 
-标记区在前 1MB **之外**（固件永远覆盖不到），出厂即 0xFF，所以"编程"能造出 `0xFF → 具体值`
-的孤立变化，一眼可辨：
+标记的地址必须同时满足三条：① 属于「上电前实测 `0xFF`」的区；② 不落在 FV / 日志 / 变量区 /
+FTW 工作区 / FTW 备用区任何保留范围内；③ 不与该区已有的固定槽位格式打架。
+**旧地址 `0x3B0000-0x3F0000` 三条全不满足**（2026-09-19 更正）：全在变量 FTW 区（`fdf.inc:97-99`），
+且 21:17 的整片无布局回读 `readback_marks_20260919_211728.bin` 实测 `0x3B0000-0x3FFFFF` 全 `0x00`
+（NOR 只能 1→0 ⇒ 往 `0x00` 编 `0xA1..0xA5` **不可能产生可见变化**，这个实验没有动态范围）。
+本轮改址见下文 v16 节，唯一机制表述见 [BOOTLOG.md](BOOTLOG.md) §2。
 
-| 扇区 | 写入值 | 含义 |
+**v16 定稿的布局：5 个标记收进 `0x36F000` 这一个 4 KB 扇区**（日志区尾部的 4 KB，
+`LS2K_MARK_BASE`，见 `Include/Library/Loongson2K1000.h`；`LS2K_BOOTLOG_SIZE` 随之从
+`0x10000` 收到 `0xF000`，日志不能再用这个扇区）：
+
+| 偏移 | 写入值 | 含义（发射点） |
 |---|---|---|
-| `0x3F0000` | `0xA1` | 复位路径跑通、DMW 生效、**且控制器接受了命令引擎的编程命令** |
-| `0x3E0000` | `0xA2` | 进入 `PreMemInit`（C 环境建立） |
-| `0x3D0000` | `0xA3` | UART 初始化完成（APB 路由/引脚复用生效） |
-| `0x3C0000` | `0xA4` | 时钟/PLL 设定后仍在执行 |
-| `0x3B0000` | `0xA5` | **DDR 初始化完成** |
+| `0x36F000` | `0xA1` | 复位路径跑通、DMW 生效（v15 工作树已删该发射点，`git diff` 可见） |
+| `0x36F001` | `0xA2` | 进入 `PreMemInit`（C 环境建立，`Sec/PreMem/LoongsonPreMem.c`） |
+| `0x36F002` | `0xA3` | UART 初始化完成（APB 路由/引脚复用生效，同上） |
+| `0x36F003` | `0xA4` | 时钟/PLL 后仍在执行（v15 工作树已删） |
+| `0x36F004` | `0xA5` | DDR 初始化完成（v15 工作树已删） |
+| `0x36F008-0x36F00A` | `SR1/SR2/SR3` | 解除保护后回读的状态寄存器快照 |
 
-判读方式：上电一次 → 取下芯片整片回读 → 看这几个字节里哪些变成了 `0xA1..0xA5`。
+判读方式：上电一次 → 取下芯片**整片无布局**回读 → 看这几个字节里哪些变成了 `0xA2/0xA3`。
+注意 `check_marks.py` 的判读表按镜像版本自动选择：v13（= HEAD）有 5 个发射点，当前工作树
+只有 2 个，**别把「5 个只读到 2 个」误报成「卡在第 3 阶段」**。
 **这是第一条完全不依赖串口、显示器、耳朵的证据通道**——也正是当初要求的
 "想知道进行到哪一步，就读 flash"。
 
-（先试过"擦除作标记"，结果发现目标扇区本来就是 0xFF，擦除等于什么都没做，遂改为编程。）
+（「先擦除作标记」的做法已放弃：目标扇区出厂即 `0xFF`，擦除等于什么都没做；
+而往 `0x00` 上编程同样不可见。现在的规则是「**先读回确认是 `0xFF`，再编程**」。
+标记在默认构建里是编译掉的——`BOOTMARK_FLASH_ENABLE=0`，要产生标记必须把这个
+`#define` 改成 `1` 再构建（**不是**命令行 `-D`：EDK2 的命令行宏只做 DSC/FDF 展开，
+到不了 C 代码，本轮实测 `gCommandLineDefines` 里有该宏而 CC_FLAGS 里没有），
+因为它会在 XIP 期间关掉 SPI 读使能。）
 
 ### 四、镜像与验证
 
@@ -517,4 +560,161 @@ void spi_initr(void) { PARAM=0x17; }
 | 真机固件卷 | `~/Downloads/CH341A/uefi_mark2.fd`，983,040 B |
 | **MD5** | `fad3a0057a41a28dd78c6e78ac702b66` |
 | QEMU 闭环 | 18 s 到 `Shell>`、串口 **59,588 B**（与 v11/v12 完全一致）、GOP 1024x768 ✓ |
-| 烧录 | 前 983,040 B 逐字节一致 ✓（2026-09-19 20:44） |
+| 烧录 | 前 983,040 B 逐字节一致 ✓（2026-09-19 20:44）——证据：`post_1m_20260919_204427.bin` 前 983,040 B 与 `uefi_mark2.fd` 的 MD5 均为 `fad3a0057a41a28dd78c6e78ac702b66`（按 `flash_beep3.sh:42-54` 的截断比对复算）。**不要引用 `flash_1m.sh` 的比对**，它恒报不一致（见「烧写与回读」节） |
+
+---
+
+## v16（本轮修复）——六领域审查后落地
+
+> **状态：代码已改；真机参数与 QEMU 参数两套构建都已编出产物并核对反汇编；QEMU 8.2 闭环已重跑
+> （到 `Shell>`）；真机未验证。** 改动来自 2026-09-19 的对抗复核（`docs/understanding/08..10`）
+> 与六领域源码审查。版本号以镜像 banner 为准。**本节的修复集 = banner `[v16]`**
+> （`Sec/PreMem/LoongsonPreMem.c:641`；在此之前工作树自报 v15，那一版从未烧入芯片；
+> 芯片里那份是 v13 = `0606bdc`）。banner 本轮由 `[v15]` 提到 `[v16]`，理由见
+> `out/CHANGES.md`：它是这块板唯一的带内版本标识，串口上读到 `v15` 就说明烧的不是这一版。
+
+### 一、CRMD：真机 `0xb8`，QEMU `0xa8`（构建开关）
+
+- v7（`c76951b`，真机记载「启动正常」）与静默镜像的入口逐条比对，**只差** `Start.S` 的
+  `li.w $t0, 0xa8` 这一处立即数（10 号 §6）；
+- `0xa8` 是 2026-09 为迁就 QEMU 改的：QEMU 在 `CRMD.DA=1 && PG=0` 时直接短路、不查 DMW
+  （`qemu-src/target/loongarch/tcg/tlb_helper.c:195-203`），而 `0xb8` 才是 v7 在真机上验证过的值；
+- 改法：新增 `BOOT_CRMD` 构建开关（`Loongson2K1000Pkg.fdf.inc` 定义 + `Loongson2K1000Pkg.dsc`
+  的 `PP_FLAGS` 下发 + `Start.S` 的 `#ifndef` 兜底），默认随 `QEMU_FIT` 推导：
+  **`QEMU_FIT=TRUE` → `0xa8`，其余构建 → `0xb8`**；命令行 `-D BOOT_CRMD=...` 覆盖一切；
+- **真机镜像必须显式给 `-D BOOT_CRMD=0xb8`**（真机镜像本身也是 `QEMU_FIT=TRUE`——那是
+  `FVMAIN_SIZE` 能塞进 1MB 窗口的原因；少给这一项就会拿到 0xa8，也就是本次故障的形态）。
+  实测命令与产物：
+
+  | 构建 | 命令 | UEFI.fd | 入口反汇编 |
+  |---|---|---|---|
+  | 真机 | `/root/ls2k.sh build -D QEMU_FIT=TRUE -D BOARD_MIN=TRUE -D BOOT_CRMD=0xb8` | 983,040 B，MD5 `021e3c81fcef71c79f8b07fc2f16279a` | FD `0x2028`: `li.w $t0, 0xb8`；`$sp = 0x1c040000` |
+  | QEMU | 同上再加 `-D PREMEM_STACK_TOP=0x90040000 -D BOOT_CRMD=0xa8` | 983,040 B，MD5 `2f0dea612e0db047f082862ee95c48b3` | FD `0x2028`: `li.w $t0, 0xa8`；`$sp = 0x9003fff8` |
+
+  `SecMain/GNUmakefile` 的 `PP_FLAGS` 逐字包含 `-D BOOT_CRMD=0xb8` / `-D BOOT_CRMD=0xa8` ⇒ 开关确实到达
+  `Start.S` 的预处理步骤。
+- **判读**：若这一条是静默的原因，板子应恢复 v7 的「上电闪一下、正常进 Boot」；仍静默 ⇒ CRMD 无罪。
+
+### 二、APB 窗口前移到咔哒之前
+
+- 唯一被真机证明能响的两份配置都是「先开 APB 窗口，再敲 GPIO39」：`tools/stub_beep.S:6-13`
+  （用户听到过哒声）与出厂 PMON（`refs/pmon/Targets/ls2k/ls2k/start.S:125-130` 开窗 → `:302` `beep_on`；
+  出厂镜像 `0x1c000058-0x1c000064` 写 BAR、`0x68` 才 `bl watchdog_close`，我反汇编核实）；
+- 改法：把**同一对写**搬进 `Start.S` 的咔哒块之前（`ApbBarConfig()` 原地保留，两处幂等），
+  并改掉 `Start.S` 里「PMON does it before it configures the APB BAR」的注释——那句与 PMON
+  源码和出厂二进制都不符（08 号 §4.2、10 号 §7.3）。反汇编实测：FD `0x2040-0x2060` 是这 6 条
+  APB 写，`0x2064` 起才是 GPIO39 咔哒块。
+
+### 三、UART 复用：寄存器是 `0x1FE00428`，不是 `0x1FE00420`
+
+- 手册 §5.2 / 表 5-3（印刷 p.36-37）：**通用配置寄存器 1，地址 `0x1FE00428`**，
+  `uart0_enable = bits[3:0]`，缺省 `0x1`（4'b0001 = 8 线模式，仅 uart0）；`4'b0011` = 4 线模式（uart0+uart3）；
+  `4'b1111` = 2 线模式（uart0+uart3+uart4+uart5）；
+- 手册 §5.1 / 表 5-2：`0x1FE00420` 的 bit0-3 是 `gmac_coherence_en`、`gmac0/1_sdb_flowctrl`、`gmac1_sel`，
+  bit4 `hda_sel`、bit6 `i2s_sel`、bit7 `lio_sel`、bit8 `sata_sel`——**这里面没有 uart0_enable**；
+- 出厂 PMON 的 `|= 0x3FD19` 确实写在 `0x1FE00420`（反汇编出厂镜像 `0x1c0015f4-0x1c001610`），
+  与 UART3 无关；出厂运行态真正接出 UART3 的是 `0x1FE00428 |= 0xf`（出厂源码
+  `Targets/ls2k/ls2k/tgt_machdep.c:361/:457`，二进制载荷 `0xa2a58`/`0xa3800`）；
+- 改法：`UartPinMuxInit()` 保留 `0x420` 的 `0x3FD19` 原样写入，**新增** `0x1FE00428[3:0] |= 0xF` 的读改写；
+- **判读**：8/10 出字 ⇒ 这条是「TTL 口从来没工作」的原因之一；8/10 仍无字而 59/60 有字 ⇒ 复用位不是瓶颈。
+  注意本轮**没有**验证「写 0x420 的低 4 位会打掉 RS232」那条旧观察（与手册表 2-22 冲突），
+  它需要一次真机 A/B，注释里已写明。
+
+### 四、标记改址 + 无界等待改有界
+
+- **标记**：5 个标记收进 `0x36F000` 一个 4 KB 扇区（`LS2K_MARK_BASE`，日志区尾部，日志缩到
+  60KB = `LS2K_BOOTLOG_SIZE 0xF000`）；**固件不再擦除**（原来每次标记都先擦 4KB，芯片忙几十毫秒，
+  而这段时间 `memory_en=0`、手册 §10.5.3 明写不能从 SPI Flash 取指）；标记字节 + SR1/SR2/SR3
+  快照由**一次页编程**写下；越界地址或码不匹配一律拒绝（旧地址 `0x3B0000-0x3F0000` 全在变量
+  FTW 区内）。函数默认编译关闭（`BOOTMARK_FLASH_ENABLE=0`，要开就改库里的 `#define`——
+  命令行 `-D` 到不了 C 代码，实测）。本轮验证：把该 `#define` 临时改成 1 后 SEC 模块以
+  `-Werror` 零告警编过，`LoongsonBootMark` 从 4 字节 `ret` 变为 660 字节，且
+  `BootMarkSend/ReadSrReg/WaitBusy/Wren` 都在符号表里；随后已还原（文件 MD5 回到
+  `918dc1e03e82b825eb746b0a5ff28885`）。
+- **有界等待**（都只在真机路径上跑）：`memdebug.S` 的 `mm_tgt_putchar`、`PmonPreSerial.S` 的
+  `tgt_putchar`/`initserial_later`、`lsmc_config_param.S` 的 `wait_dram_init`、
+  `loongson3C_ddr3_leveling.S` 的 `wait_dram_init_done` —— 原先任何一个等不到 UART/控制器
+  就永久自旋，症状与「三声之后什么都没有」完全一致。
+
+### 五、flash 日志（唯一机制与当前状态）
+
+见 [BOOTLOG.md](BOOTLOG.md) §2。关键一条：当前板级构建 `BOOTLOG_FLASH_ENABLE=0`
+（`Library/LoongsonBootLogLib/LoongsonBootLogLib.c:130-132`），**本轮镜像不会在 `0x360000`
+留下任何字节**，别把「日志区是空的」当成「固件没跑到」。
+
+### 六、QEMU 闭环（本轮实测，QEMU 8.2）
+
+同源码只差 `-D PREMEM_STACK_TOP=0x90040000 -D BOOT_CRMD=0xa8`，装入 `-M ls2k`：
+
+```
+--- serial: 59877 bytes ---
+=== LS2K1000LA EDK2 SEC [v16] ===
+APB BAR, pin mux, watchdog: done
+CFG0=0x0003FD19 CFG1=0x0000000F LSR0=0x60 LSR3=0x60
+first beep done
+flash mark A2 compiled out (BOOTMARK_FLASH_ENABLE=0)
+buzzer scale played
+flash mark A3 compiled out (BOOTMARK_FLASH_ENABLE=0)
+PCIe early config...
+PCIe early config done
+SEC stage finished, clock stage next
+...
+Soft CLK SEL adjust begin / Start Init Memory, wait a while......
+...
+GOP ready (1024x768-32)
+Shell>
+```
+
+`[poll] Shell> at 18s`（v15 那次也是 18s）；串口日志 `/qemu/out/s_v16final.log`（59,877 B）
+——**这段是 2026-09-20 在最终版源码上重跑并逐行摘录的**，不是转抄。第三行是「第一行自描述」：
+`CFG1` 的低半字节证明复用寄存器写入生效（0x1 = 没写进去），两个 `LSR` 回读把「控制器在」与
+「这个口根本没被译码」分开。标记那两行本文由「written」改成「compiled out」：默认构建
+`BOOTMARK_FLASH_ENABLE=0`，原来那行会在什么都没写的情况下断言"已写入"。
+
+### 七、烧录与校验（唯一可引用的证据）
+
+```bash
+cd ~/Downloads/CH341A
+./flash_beep3.sh <镜像.fd>
+```
+
+- 比对逻辑在 `flash_beep3.sh:42-54`（把回读截断到镜像长度再比）；`flash_1m.sh` 原先的比对恒假，
+  本轮已按同一写法修正（并会把镜像补 `0xFF` 到整片再写，规避 flashrom 对布局写要求整片大小的限制）。
+- **下次上机前先跑**（无布局整片读，确认标记扇区是 `0xFF`）：
+
+```bash
+~/.local/opt/flashrom/sbin/flashrom -p ch341a_spi -c "W25Q32BV/W25Q32CV/W25Q32DV" -r /tmp/chip.bin --noverify-all
+python3 ~/Downloads/CH341A/check_marks.py /tmp/chip.bin <镜像.fd>
+```
+
+本轮**没有**接编程器、没有上电：上述命令未执行（CH341A 不在线）。
+
+---
+
+## v25/v26（2026-09-23）——无声重查：发声器缩小 94 倍的盲区
+
+v25（`uefi-v25-stack-cache.fd`，MD5 `62dfb3a9a299dcdac7685467ba39b68d`）上机全无声。
+重新分组排查（详见 docs/understanding/12-silence-analysis-v25.md）找到 **方向性反转**：
+
+- v22-v25 四版入口在第一声之前**逐字节相同**（实测 diff：v22==v25 至 0x2051）；
+- v17 能听见的"入口 1 声"是内联点击块（半周期 0x4000/0x8000 次），v22 起换成的
+  `LoongsonBeepRaw` 半周期只有 0xaa=170 次——**短 94 倍**；
+- 因此 **「v22-v25 全无声」与「执行正常但声音太短没听到」不可区分**——死点分析此前
+  一直在错误的前提下进行。
+
+同时修掉 v24 引入的死循环（`bl 2f` 后 `addi.d $t0,$ra,0` 使 jirl 跳回自身——
+反汇编 `0x20b8-0x20c8` 实锤），v25 已改回原地写 0xb8。
+
+**修复处方**（12 号 §3）：F1 蜂鸣 0xaa→0x2000（已做=v26）；F2 删非页对齐 EENTRY 死代码；
+F3 touch walk 先写后读；F4 栈归宿等 E2 裁决。**实验序列**（12 号 §4）：E0 烧回 v17 对照 →
+E1 数声定位死点到 5 个互斥区间 → E2-E5 条件触发。
+
+**新文档**：`docs/understanding/11-pmon-baseline-annotated.md`——出厂 PMON 干净启动日志
+（46,954B，`~/Downloads/CH341A/PMON-baseline-clean.log`）逐行拆解 + 29 项移植版对拍点清单；
+`12-silence-analysis-v25.md` 如上。
+
+| 项 | v26 |
+|---|---|
+| 镜像 | `out/uefi-v26-beep2000.fd` |
+| MD5 | `85e4eb1a3ae59f26e921517fc1c7bdf6` |
+| 变更 | = v25 + 蜂鸣半周期 0xaa→0x2000（2 处），其余不动 |

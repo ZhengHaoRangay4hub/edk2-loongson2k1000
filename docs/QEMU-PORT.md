@@ -153,17 +153,14 @@ GPUBASE=`0xd0000000`。）
 顺带解决了"1 MB 窗口导致 QEMU_FIT 必须压缩固件"的根因：真机镜像（1.40 MB）现在
 在 QEMU 里也能被读取（板级镜像仍卡在 DxeIpl 解压 10.4 MB 卷，是模拟器速度问题）。
 
-### 3.3 临时调试标记（**收尾时必须删除**）
+### 3.3 临时调试标记（**已删除**，2026-09-17）
 
-`hw/loongarch/2k1000.c` 中现有 6 处 `fprintf(stderr, "LS2KMARK ...")`：
+`hw/loongarch/2k1000.c` 里曾有 6 处 `fprintf(stderr, "LS2KMARK ...")`（`cpu %d`、`ram+flash done`、
+`pcibus done`、`intc0 done`、`uarts done`、`init done`）。**§3.4 末行已记「临时 LS2KMARK 打印已全部删除」**
+——本节此前与 §3.4 自相矛盾，现对齐；核对方式（本轮实跑，输出 0）：
 
-```
-702:  LS2KMARK cpu %d
-822:  LS2KMARK ram+flash done
-825:  LS2KMARK pcibus done
-852:  LS2KMARK intc0 done
-880:  LS2KMARK uarts done
-1244: LS2KMARK init done
+```bash
+docker exec ls2kq4 grep -c LS2KMARK /qemu/qemu-src/hw/loongarch/2k1000.c   # 期望 0
 ```
 
 ---
@@ -196,7 +193,11 @@ WakeUpAP: func 0x1C0349F0, ExchangeInfo 0x820E8
 
 ---
 
-## 5. 当前唯一阻塞：双核 host SIGSEGV
+## 5. 双核 host SIGSEGV（**已解决**，2026-09-17）
+
+> 本文件开头第 7-8 行记：「SIGSEGV 根因（IOCSR 地址空间未建 → `env->address_space_iocsr == NULL`
+> 解引用）已被修复证实——修复后双核不再崩、`-smp 1` 能过 `WakeUpAP`」。
+> 下列内容保留为**排查过程存档**，不要当成当前阻塞。
 
 ### 现象
 

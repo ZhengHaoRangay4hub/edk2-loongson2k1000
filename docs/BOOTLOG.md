@@ -46,17 +46,62 @@ python3 tools/decode_bootlog.py chip.bin --hex    # 附带原始字节
 
 | NOR 偏移 | 内容 |
 |---|---|
-| `0x000000-0x360000` | 固件卷 FV |
-| **`0x360000-0x370000`** | **进度日志（16 字节头 + 每个事件码 4 字节槽位）** |
+| `0x000000-0x360000` | 固件卷 FV（`FVMAIN_SIZE`；`BOARD_MIN` 构建实际只占 `0xF0000`） |
+| **`0x360000-0x36F000`** | **进度日志**（16 字节头 + 每个事件码 4 字节槽位），**也是诊断裸标记唯一允许的区**（见本节末） |
+| `0x36F000-0x370000` | 裸标记扇区（`LS2K_MARK_BASE`，**日志不得占用**；仅把库里的 `BOOTMARK_FLASH_ENABLE` 改成 1 的诊断构建会写） |
 | `0x370000-0x3B0000` | UEFI 变量存储 |
 | `0x3B0000-0x3C0000` | 变量 FTW 工作区 |
 | `0x3C0000-0x400000` | 变量 FTW 备用区 |
+
+**这张表是 flash 地址的唯一来源**，与 `Platform/Loongson/Loongson2K1000Pkg/Loongson2K1000Pkg.fdf.inc`
+以及 [FLASHING.md](FLASHING.md) §0 必须逐字一致。`0x1c000000` 的 XIP 窗口只覆盖前 1 MB，
+与这张表不是一回事（见 §3.1）。
 
 - **头部**：`"BLOG"` + 版本号；写入即代表固件至少跑到了第一个里程碑。
 - **槽位**：`offset = 0x360000 + 16 + 事件码 × 4`，3 字节小端参数 + 1 字节标记 `0x5A`。
 - **只写不读、不擦除**：固件从不擦除这个区域，也不回读它——每次启动把相同的字节写进相同的槽位
   （NOR 只能 1→0，重复写同值是空操作），所以日志**累积"自上次刷写/擦除以来达到的最远进度"**。
-  想看一次干净的单次启动记录，用编程器把这 64KB 擦掉即可（或重新刷固件，镜像里该区是 0xFF）。
+  想看一次干净的单次启动记录，用编程器把这 60KB 擦掉即可（或重新刷固件，镜像里该区是 0xFF）。
+- **当前板级构建里这条通路是关的**：`BOOTLOG_FLASH_ENABLE` 默认 `0`
+  （`Library/LoongsonBootLogLib/LoongsonBootLogLib.c:130-132`），两个 API 被编成 4 字节 `ret`
+  ⇒ **这一版镜像不会在 `0x360000` 留下任何字节**。回读到的 `0xFF` 只能说明「这版固件没写日志」，
+  **不能**说明「固件没跑到」。要打开它必须先解决 §3.2 的取指冲突。
+- **留痕只有两套，别混用**：本节是**日志**（固定槽位、有事件码）；另有一套**裸标记**
+  `LoongsonBootMark(n, v)`（在 `0x36F000` 扇区的一个字节，无头无码），规则见本节末。
+  repo 里关于留痕的其它说法（`Include/Library/LoongsonBootLog.h:10-13` 旧版的「每次启动用一个 4KB
+  扇区、16 个扇区轮换、满了擦掉重来」）**与实现不符**，以实现与本节为准。
+
+**诊断裸标记（`LoongsonBootMark`）的唯一规则**
+
+裸标记地址必须同时满足：① 上电前实测 `0xFF`；② 不落在 FV `0x0-0x360000`、变量区
+`0x370000-0x3B0000`、FTW 工作 `0x3B0000-0x3C0000`、FTW 备用 `0x3C0000-0x400000` 之内；
+③ 不落在日志的槽位区 `0x360000-0x36F000`（最大槽位 `0x360000+16+0xE2*4 = 0x360398`）。
+
+当前常量：`LS2K_MARK_BASE = 0x36F000`（`Include/Library/Loongson2K1000.h`），5 个标记
+`0x36F000..0x36F004`（码 `0xA1..0xA5`），`0x36F008-0x36F00A` 是 SR1/SR2/SR3 快照；
+日志区随之从 64KB 收到 60KB（`LS2K_BOOTLOG_SIZE = 0xF000`）。
+
+**旧地址 `0x3B0000-0x3F0000` 三条全不满足**：它们全部落在 FTW 区（`fdf.inc:97-99`），
+而且 2026-09-19 21:17 的整片无布局回读 `readback_marks_20260919_211728.bin` 实测该区全 `0x00`
+——NOR 只能 1→0，往 `0x00` 编 `0xA1..0xA5` **不可能产生可见变化**，那个实验没有动态范围。
+（同一份回读里 `0x36F000-0x36FFFF` 是全 `0xFF`，出厂 dump 与 21:01 的整片读也一样。）
+**代码常量是唯一来源**，改地址必须同步 [BRINGUP.md](BRINGUP.md) 的标记表与
+`~/Downloads/CH341A/check_marks.py` 的判读表。
+
+标记在默认构建里**不产生任何写入**（`BOOTMARK_FLASH_ENABLE=0`）：它会在 XIP 期间关掉
+SPI 读使能，本板尚未验证这样是否会打断取指（09 号 §2.4）。诊断构建才写：把
+`Library/LoongsonBootLogLib/LoongsonBootLogLib.c` 里的 `#define BOOTMARK_FLASH_ENABLE`
+改成 `1` 再构建（**不是**命令行 `-D`：EDK2 的命令行宏只做 DSC/FDF 展开，到不了 C 代码——
+本轮实测，BuildOptions 的 `gCommandLineDefines` 有该宏而 CC_FLAGS 没有，镜像里
+`LoongsonBootMark` 仍是 4 字节 `ret`）。
+
+上电前的验证命令（**必须跑**；若输出不是 `0xff`，先擦该扇区再烧镜像）：
+
+```bash
+~/.local/opt/flashrom/sbin/flashrom -p ch341a_spi -c "W25Q32BV/W25Q32CV/W25Q32DV" \
+  -r /tmp/chip.bin --noverify-all          # 无布局整片读（4 MB）
+python3 -c "d=open('/tmp/chip.bin','rb').read(); print([hex(d[o]) for o in (0x36F000,0x36F001,0x36F002)])"
+```
 
 ## 3. 为什么这样设计（踩过的坑）
 
