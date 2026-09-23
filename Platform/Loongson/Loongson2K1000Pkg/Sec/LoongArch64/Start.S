@@ -306,12 +306,23 @@ ASM_PFX(_ModuleEntryPoint):
 	 * and the touch walk right after (PMON start.S:507-514, "ensure locked
 	 * cache address accessible") makes sure every line is resident before the
 	 * first C prologue pushes to it.
+	 *
+	 * QEMU_SKIP_SCACHE_LOCK: the ls2k machine model has no device at
+	 * 0x1fe00200 and - unlike real silicon, where PMON writes these same
+	 * registers - QEMU raises ADE (address error) on the st.d, killing the
+	 * emulated boot before the serial banner.  The QEMU regression build
+	 * therefore skips ONLY the two register writes (touch walk and probes
+	 * keep running against QEMU's RAM alias at 0x90000000).  Never define
+	 * this for a board image: on silicon the lock is what makes the stack
+	 * region real.
 	 */
+#ifndef QEMU_SKIP_SCACHE_LOCK
 	li.d	$t0, 0x800000001fe00200
 	li.d	$t1, ~(0x40000 - 1)
 	st.d	$t1, $t0, 0x40			/* size mask: 256 KB */
 	li.d	$t1, 0x8000000090000000		/* base 0x90000000 + enable */
 	st.d	$t1, $t0, 0x0
+#endif
 
 	/* Touch walk: read every line once so the lock actually holds it. */
 	li.d	$t0, 0x9000000090000000

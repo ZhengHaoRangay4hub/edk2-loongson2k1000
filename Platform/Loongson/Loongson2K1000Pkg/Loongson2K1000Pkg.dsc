@@ -19,6 +19,17 @@
   DEFINE BOARD_MIN = FALSE
 !endif
 
+#
+# SKIP_SCACHE_LOCK is passed on the command line for the QEMU regression build
+# only: the ls2k machine model raises ADE on the scache-lock register writes
+# (no device at 0x1fe00200), which kills the emulated boot before the banner.
+# Board images must NOT pass it - on silicon the lock is what makes the
+# pre-DRAM stack real.  See Sec/LoongArch64/Start.S.
+#
+!ifndef SKIP_SCACHE_LOCK
+  DEFINE SKIP_SCACHE_LOCK = FALSE
+!endif
+
 ################################################################################
 #
 # Defines Section - statements that will be processed to create a Makefile.
@@ -94,7 +105,11 @@
   # It has to travel through PP_FLAGS for the same reason PREMEM_STACK_TOP
   # does: Start.S is assembled from `$(PP) $(PP_FLAGS)`.
   #
+!if $(SKIP_SCACHE_LOCK) == TRUE
+  GCC:*_*_*_PP_FLAGS = -D BOOT_CRMD=$(BOOT_CRMD) -D PREMEM_STACK_TOP=$(PREMEM_STACK_TOP) -D DDR_S1=0xc0a18404 -D DDR_PARAM_018=0x3030303016100000 -D DDR_PARAM_140=0x00030000010f01ff -D LS2K_STR -D QEMU_SKIP_SCACHE_LOCK
+!else
   GCC:*_*_*_PP_FLAGS = -D BOOT_CRMD=$(BOOT_CRMD) -D PREMEM_STACK_TOP=$(PREMEM_STACK_TOP) -D DDR_S1=0xc0a18404 -D DDR_PARAM_018=0x3030303016100000 -D DDR_PARAM_140=0x00030000010f01ff -D LS2K_STR
+!endif
 
 [BuildOptions.LOONGARCH64.EDKII.SEC]
   *_*_*_CC_FLAGS                 =
