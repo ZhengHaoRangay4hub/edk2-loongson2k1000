@@ -41,8 +41,14 @@ ATTENTION:
 #define DDR_LOOPC  (DDR_FREQ*DDR_REFC*DDR_DIV*DDR_DIV_L2/100)
 
 #ifndef CORE_FREQ
-/* CPU @ 800Mhz */
-#define CORE_FREQ   800
+/* CPU @ 1000Mhz：本板出厂 PMON 镜像在 0x1c001308-0x1c001318 用
+   lu12i.w/ori/lu32i.d 拼出的 L1 PLL 字是 0x0000045010000C80，
+   扣掉 L1_DIV(1<<42=0x400) 后 L1_LOOPC=0x50=80，即
+   100M/4*80/1/2 = 1GHz；2K1000LA 用户手册也写明本芯片主频 1GHz。
+   800 是 conf/ls2k:57 的值，出厂二进制并未采用（该 conf 的
+   DDR_FREQ=300 同样没被采用，见 DDR_LOOPC）。
+   DSC 的 PP_FLAGS 不过覆盖 CORE_FREQ，所以这里就是生效值。 */
+#define CORE_FREQ   1000
 #endif
 
 #define L1_REFC     4

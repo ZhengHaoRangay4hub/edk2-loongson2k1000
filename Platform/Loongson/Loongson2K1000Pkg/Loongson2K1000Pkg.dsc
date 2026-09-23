@@ -9,6 +9,16 @@
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
 ##
 
+#
+# BOARD_MIN is passed on the command line (build -D BOARD_MIN=TRUE) for the
+# 1 MB image that fits the boot window.  The DSC needs its own default because
+# it is parsed separately from the FDF: without this the \$(BOARD_MIN) test in
+# the Components section below would fail on a build that does not pass it.
+#
+!ifndef BOARD_MIN
+  DEFINE BOARD_MIN = FALSE
+!endif
+
 ################################################################################
 #
 # Defines Section - statements that will be processed to create a Makefile.
@@ -76,7 +86,15 @@
   #   entries 56 and 62 are set directly in loongson_mc2_param.S -- their
   #   macros ignore a -D override on this branch.
   #
-  GCC:*_*_*_PP_FLAGS = -D PREMEM_STACK_TOP=$(PREMEM_STACK_TOP) -D DDR_S1=0xc0a18404 -D DDR_PARAM_018=0x3030303016100000 -D DDR_PARAM_140=0x00030000010f01ff -D LS2K_STR
+  #
+  # BOOT_CRMD is the CRMD value the SEC entry writes: the board value is 0xb8
+  # (field-proven) and the emulator needs 0xa8.  Both defaults live in
+  # Loongson2K1000Pkg.fdf.inc; the emulator overrides it with
+  #   build -D BOOT_CRMD=0xa8
+  # It has to travel through PP_FLAGS for the same reason PREMEM_STACK_TOP
+  # does: Start.S is assembled from `$(PP) $(PP_FLAGS)`.
+  #
+  GCC:*_*_*_PP_FLAGS = -D BOOT_CRMD=$(BOOT_CRMD) -D PREMEM_STACK_TOP=$(PREMEM_STACK_TOP) -D DDR_S1=0xc0a18404 -D DDR_PARAM_018=0x3030303016100000 -D DDR_PARAM_140=0x00030000010f01ff -D LS2K_STR
 
 [BuildOptions.LOONGARCH64.EDKII.SEC]
   *_*_*_CC_FLAGS                 =
@@ -356,13 +374,15 @@
 
   gEfiMdeModulePkgTokenSpaceGuid.PcdBootManagerMenuFile                | { 0xdc, 0x5b, 0xc2, 0xee, 0xf2, 0x67, 0x95, 0x4d, 0xb1, 0xd5, 0xf8, 0x1b, 0x20, 0x39, 0xd1, 0x1d }
 
-  # UEFI variable store lives in the SPI NOR behind the 4MB firmware image.
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase64       | 0x1c370000
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableSize         | 0x40000
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingBase64     | 0x1c3B0000
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingSize       | 0x10000
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase64       | 0x1c3C0000
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareSize         | 0x40000
+  # UEFI variable store lives in the SPI NOR behind the firmware volume.  The
+  # offsets come from the layout table in Loongson2K1000Pkg.fdf.inc so that a
+  # later move cannot desync the DSC from the FDF/SEC view of the chip.
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase64       | $(FW_BASE_ADDRESS) + $(FLASH_VARSTORE_OFFSET)
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableSize         | $(FLASH_VARSTORE_SIZE)
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingBase64     | $(FW_BASE_ADDRESS) + $(FLASH_FTW_WORK_OFFSET)
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingSize       | $(FLASH_FTW_WORK_SIZE)
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareBase64       | $(FW_BASE_ADDRESS) + $(FLASH_FTW_SPARE_OFFSET)
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareSize         | $(FLASH_FTW_SPARE_SIZE)
 
 !if $(QEMU_FIT) == TRUE
   #
@@ -564,7 +584,9 @@
   #
   # Graphical (LVGL) setup center replaces the text UiApp setup front page.
   #
+!if $(BOARD_MIN) == FALSE
   LvglPkg/Application/LvglSetupApp/LvglSetupApp.inf
+!endif
 
   #
   # Console

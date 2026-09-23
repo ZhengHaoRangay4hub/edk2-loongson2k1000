@@ -7,10 +7,13 @@
   the chip can be read with a programmer and the log decoded offline with
   tools/decode_bootlog.py -- no serial console needed.
 
-  Region: LS2K_BOOTLOG_BASE .. +LS2K_BOOTLOG_SIZE (64 KB, 16 sectors of 4 KB),
-  carved out just below the variable store.  One sector is used per boot and
-  the sectors are consumed in order, so the last 16 boots stay available; once
-  all 16 are full the region is erased and the sequence restarts.
+  Region: LS2K_BOOTLOG_BASE .. +LS2K_BOOTLOG_SIZE (60 KB, 15 sectors of 4 KB),
+  carved out just below the variable store, with the last 4 KB sector of the log
+  area (LS2K_MARK_BASE, Loongson2K1000.h) reserved for the progress marks and
+  never used by the log.  The implementation today writes one fixed slot per
+  event code in the first sector (see the LOG_* defines in the library) rather
+  than one sector per boot; if the per-boot rotation is implemented, it must stop
+  at LS2K_MARK_BASE.
 
   Every write is best effort: a missing or uncooperative flash must never stop
   the boot, so all waits are bounded and failures are simply dropped.
@@ -22,6 +25,28 @@
 
 #ifndef LOONGSON_BOOT_LOG_H_
 #define LOONGSON_BOOT_LOG_H_
+
+/*
+ * Build-time switches for the two flash-writing paths (the event log and the
+ * progress marks).  They are defined here rather than inside the library's .c
+ * so that every caller can tell whether the call it is about to make writes
+ * anything at all: a console message printed next to a compiled-out call
+ * ("flash mark A2 written") reads as evidence that the flash was programmed,
+ * and on a board whose only other symptom is silence that is exactly the wrong
+ * conclusion to hand an operator.  Guard such messages with these macros.
+ *
+ * Both default to 0 because each of them switches off the instruction fetch
+ * the SEC phase is running from (manual 10.5.3: with the SPI read enable
+ * clear, the chip cannot fetch from SPI flash).  To enable, edit this file --
+ * EDK2 command-line -D defines expand in the DSC/FDF and never reach C code.
+ */
+#ifndef BOOTLOG_FLASH_ENABLE
+#define BOOTLOG_FLASH_ENABLE   0
+#endif
+
+#ifndef BOOTMARK_FLASH_ENABLE
+#define BOOTMARK_FLASH_ENABLE  0
+#endif
 
 /*
  * Event codes.  Keep the numeric values stable: the decoder in
@@ -83,6 +108,18 @@ LoongsonBootBeep (
   );
 
 /**
+  Play PMON's own beep waveform from assembly.  Defined in Sec/LoongArch64/
+  Start.S: half period 0x2000 iterations of addi.w+nop+bnez, 0x80 half periods
+  per beep, GPIO39.  Needs no stack.
+
+  @param[in]  Count  Number of beeps.
+**/
+VOID
+LoongsonBeepRaw (
+  IN UINTN  Count
+  );
+
+/**
   One long beep, used for the "reached the boot menu" milestone.
 **/
 VOID
@@ -92,22 +129,41 @@ LoongsonBootBeepLong (
   );
 
 /**
-  Program one byte high in the flash, as a "the firmware reached here" mark.
+  Program one byte in the mark sector, as a "the firmware reached here" mark.
 
-  The board has no console and no display before DXE, so the only dependable
-  way to see how far a boot got is to leave a trace in the flash and read it
-  back with a programmer.  The sectors used are erased (0xFF) as the board
-  ships and each mark lands at the start of its own 4 KB block, far above the
-  firmware, so a mark is a lone byte in a field of 0xFF and no image can
-  collide with it.
+  The board has no console and no display before DXE, so the only dependable way
+  to see how far a boot got is to leave a trace in the flash and read it back
+  with a programmer.  All marks live in the single 4 KB sector at LS2K_MARK_BASE
+  (top of the log region, the one 4 KB of the part that is above the 1 MB reset
+  window, outside every firmware volume, outside the variable store and outside
+  its FTW blocks, and erased as the board ships), so a mark is a lone byte in a
+  field of 0xFF:
 
-  @param[in]  SectorOffset  Absolute flash offset to program.
-  @param[in]  Code          Byte to write; 0xFF means "no mark".
+    0x36F000 0xA1  reset path ran          LS2K_MARK_A1
+    0x36F001 0xA2  PreMemInit entered      LS2K_MARK_A2
+    0x36F002 0xA3  UART up                 LS2K_MARK_A3
+    0x36F003 0xA4  after clock/PLL         LS2K_MARK_A4
+    0x36F004 0xA5  DDR up                  LS2K_MARK_A5
+    0x36F008 SR1 read back after the unprotect  LS2K_MARK_SR1
+    0x36F009 SR2 read back                      LS2K_MARK_SR2
+    0x36F00A SR3 read back                      LS2K_MARK_SR3
+
+  There is no erase in the firmware: the sector ships erased, programming 0xFF
+  into 0xFF is a no-op, and a 4 KB erase would keep the chip busy for tens of
+  milliseconds with the SPI read enable off.  Erase the sector with the
+  programmer to reset the baseline before an experiment.
+
+  The function is compiled out unless BOOTMARK_FLASH_ENABLE is set (see the
+  library): it is the only code in SEC that turns off the instruction fetch it
+  depends on.
+
+  @param[in]  Offset  One of LS2K_MARK_A1..A5.  Any other address is refused.
+  @param[in]  Code    0xA1..0xA5, matching the slot; a mismatch is refused.
 **/
 VOID
 EFIAPI
 LoongsonBootMark (
-  IN UINTN  SectorOffset,
+  IN UINTN  Offset,
   IN UINT8  Code
   );
 

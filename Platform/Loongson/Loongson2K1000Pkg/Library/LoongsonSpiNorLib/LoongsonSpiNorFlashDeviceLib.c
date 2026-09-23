@@ -22,7 +22,7 @@
 #include <Library/VirtNorFlashDeviceLib.h>
 
 /* Uncached alias of a physical address (DMW0 configured in Start.S). */
-#define UNCACHED(x)  ((UINTN)(0x9000000000000000ULL | (UINT64)(x)))
+#define UNCACHED(x)  ((UINTN)(0x8000000000000000ULL | (UINT64)(x)))
 
 /* SPI controller registers. */
 #define SPI_REG_BASE    (UNCACHED (FixedPcdGet32 (PcdLoongsonSpiControllerBase)))

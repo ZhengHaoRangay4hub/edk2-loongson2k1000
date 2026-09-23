@@ -6,8 +6,20 @@
   expects PMON's header environment. This header provides the same macros
   under the standard LoongArch EDK2 direct-mapping-window convention:
 
-    DMW0 = 0x9000000000000000 : PLV0..3, MAT=0 (strongly-ordered uncached)
-    DMW1 = 0x8000000000000000 : PLV0..3, MAT=1 (coherent cached)
+    DMW0 = 0x8000000000000000 : PLV0..3, MAT=0 (strongly-ordered uncached)
+    DMW1 = 0x9000000000000000 : PLV0..3, MAT=1 (coherent cached)
+
+  CACHED_MEMORY_ADDR is the uncached address on purpose, so PHYS_TO_CACHED()
+  and PHYS_TO_UNCACHED() are the same value here: every MMIO access in this
+  tree goes through the uncached window, and PMON's "cached alias" only ever
+  mattered for the locked-cache region, which is addressed with hard-coded
+  0x9000... literals (Sec/LoongArch64/Start.S, Sec/PreMem/DdrEntry.S) and is
+  not affected by this header.  Do not "fix" this back to 0x9000000000000000:
+  that would turn every access through this macro into a cached one, which is
+  how this port went silent on hardware.  The two consumers that still call it
+  are dead code today - ddr_dir/Test_Mem.h:63 (MEM_TEST_BASE, needs DEBUG_DDR)
+  and ddr_dir/store_auto_arb_level_info.S:3 (DIMM_INFO_ADDR, needs ARB_LEVEL) -
+  and both must be revisited before anything else starts using it.
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
@@ -15,7 +27,8 @@
 #ifndef __PMON_DEFS_H__
 #define __PMON_DEFS_H__
 
-#define UNCACHED_MEMORY_ADDR  0x9000000000000000
+/* Both are the 0x8000 uncached window; see the note above. */
+#define UNCACHED_MEMORY_ADDR  0x8000000000000000
 #define CACHED_MEMORY_ADDR    0x8000000000000000
 
 #define PHYS_TO_UNCACHED(x)  (UNCACHED_MEMORY_ADDR | (x))

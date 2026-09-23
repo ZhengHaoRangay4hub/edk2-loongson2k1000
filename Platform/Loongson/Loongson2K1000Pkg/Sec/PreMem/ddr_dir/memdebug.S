@@ -102,13 +102,19 @@ END(Inputhex)
 
 LEAF(mm_tgt_putchar)
     li.d  $a4, COM1_BASE_ADDR
+    addi.d $sp, $sp, -16
+    st.d   $t0, $sp, 0
+    li.d   $t0, 0x40000
 1:
     ld.bu $a5, $a4, NSREG(NS16550_LSR)
     andi   $a5, $a5, LSR_TXRDY
-    beqz    $a5, 1b
-    nop
-
+    bnez    $a5, .Lmm_tx_ready
+    addi.d $t0, $t0, -1
+    bnez    $t0, 1b
+.Lmm_tx_ready:
     st.b  $a0, $a4, NSREG(NS16550_DATA)
+    ld.d   $t0, $sp, 0
+    addi.d $sp, $sp, 16
    jirl    $zero, $ra, 0
     nop
 END(mm_tgt_putchar)

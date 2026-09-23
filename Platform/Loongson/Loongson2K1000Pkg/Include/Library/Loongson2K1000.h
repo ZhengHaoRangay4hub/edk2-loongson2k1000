@@ -12,10 +12,11 @@
 #define LOONGSON_2K1000_H_
 
 /*
- * LoongArch maps I/O space at 0x9000000000000000 (uncached) and
+ * LoongArch maps I/O space through an uncached DMW window - 0x8000_0000_... on
+ * this board, the window PMON, the field-proven beep stub and Linux all use - and
  * 0xA000000000000000 (strongly uncached) in 64-bit mode.
  */
-#define LS_MMIO_UNCACHED(Base)  (0x9000000000000000ULL | (UINT64)(Base))
+#define LS_MMIO_UNCACHED(Base)  (0x8000000000000000ULL | (UINT64)(Base))
 
 /* APB / low-speed peripherals on the 2K1000LA internal bus */
 #define LS2K_UART0_BASE         0x1fe20000  /* 16550, RS232 debug port (board pins 59/60) */
@@ -37,11 +38,15 @@
  * firmware on the first character.
  */
 /*
- * Only UART0 and UART3 are live in the reset configuration: the pin mux
- * register at 0x1fe00420 defaults uart0_enable = 0x1 (4 wire mode), which the
- * datasheet documents as "uart0 + uart3".  UART4/UART5 exist only in the 4x2
- * mode, so poking 0x1fe20400/0x1fe20500 on this board touches UARTs that are
- * not clocked -- observed to disturb the boot, and pointless.
+ * Only UART0 and UART3 are live in the reset configuration.  The pin-mux field
+ * is uart0_enable, in general configuration register 1 at 0x1fe00428 (manual
+ * table 5-3, printed page 37), and it resets to 4'b0001 = "8 wire mode, uart0
+ * only"; 0x1fe00420 is general configuration register 0 (table 5-2) and has no
+ * UART field at all.  UartPinMuxInit() writes 0xF - the factory's running
+ * state, "2 wire mode" with uart0 + uart3 + uart4 + uart5 - late in SEC, so
+ * before that only UART0 is muxed out.  Poking 0x1fe20400/0x1fe20500 on this
+ * board is pointless in the reset configuration and was observed to disturb
+ * the boot.
  */
 #define LS2K_CONSOLE_BASE        LS2K_UART0_BASE   /* RS232, pins 59/60 (PMON's port) */
 #define LS2K_CONSOLE_MIRROR0_BASE LS2K_UART3_BASE  /* LVTTL, pins 8/10, GND 9         */
@@ -51,14 +56,49 @@
 #define LS2K_SPI0_BASE          0x1fff0220  /* on-chip SPI master (SPI NOR) */
 
 /*
- * Boot progress log: 64 KB carved out of the firmware volume's tail, just
+ * Boot progress log: 60 KB carved out of the firmware volume's tail, just
  * below the variable store, so the firmware can record how far it got without
  * a serial console.  Read the chip with a programmer and decode with
  * tools/decode_bootlog.py.  FVMAIN_SIZE in Loongson2K1000Pkg.fdf.inc must stay
- * below this address.
+ * below this address (0x360000 in the full-feature build, 0xF0000 in BOARD_MIN).
  */
 #define LS2K_BOOTLOG_BASE       0x360000
-#define LS2K_BOOTLOG_SIZE       0x10000
+#define LS2K_BOOTLOG_SIZE       0xF000
+
+/*
+ * Progress marks (Library/LoongsonBootLogLib, LoongsonBootMark): one 4 KB sector
+ * held out of the top of the log region so the log can never consume it.  Where
+ * it sits is not arbitrary -- it is the only 4 KB of the 4 MB part that meets all
+ * four constraints at once:
+ *   - above the 1 MB reset window (0x1c000000-0x1c0fffff): never inside the window
+ *     the XIP engine serves, never inside the part an image write to the boot
+ *     window can touch;
+ *   - outside FVMAIN_COMPACT, which ends at 0x360000 in the full-feature build
+ *     (Loongson2K1000Pkg.fdf.inc:119-123) and at 0xF0000 under BOARD_MIN;
+ *   - outside the variable store (0x370000-0x3B0000), the FTW working block
+ *     (0x3B0000-0x3C0000) and the FTW spare block (0x3C0000-0x400000) -- which is
+ *     where the marks used to live (Loongson2K1000Pkg.dsc:366-375);
+ *   - erased (0xFF) as the board ships: measured all-0xFF over 0x36F000-0x36FFFF
+ *     in the factory dump W25Q32_dump_20260915_115813.bin, in the post-boot read
+ *     readback_after_boot_195016.bin and in the latest full-chip read
+ *     readback_marks_20260919_211728.bin.
+ * The slot layout inside the sector is fixed by LoongsonBootLog.h; every mark must
+ * name one of LS2K_MARK_A1..A5, because LoongsonBootMark() refuses anything else.
+ */
+#define LS2K_MARK_BASE          0x36F000
+#define LS2K_MARK_SIZE          0x1000
+
+#define LS2K_MARK_A1            (LS2K_MARK_BASE + 0x00)  /* reset path ran     */
+#define LS2K_MARK_A2            (LS2K_MARK_BASE + 0x01)  /* PreMemInit entered */
+#define LS2K_MARK_A3            (LS2K_MARK_BASE + 0x02)  /* UART up            */
+#define LS2K_MARK_A4            (LS2K_MARK_BASE + 0x03)  /* after clock/PLL    */
+#define LS2K_MARK_A5            (LS2K_MARK_BASE + 0x04)  /* DDR up             */
+
+/* Status-register snapshot, programmed in the same page program as the mark. */
+#define LS2K_MARK_SR1           (LS2K_MARK_BASE + 0x08)
+#define LS2K_MARK_SR2           (LS2K_MARK_BASE + 0x09)
+#define LS2K_MARK_SR3           (LS2K_MARK_BASE + 0x0A)
+#define LS2K_MARK_PAGE_LEN      0x0B
 
 #define LS2K_PMC_BASE           0x1fe27000  /* power management (reset/shutdown) */
 

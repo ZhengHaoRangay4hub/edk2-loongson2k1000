@@ -181,15 +181,21 @@ ddr3_leveling:
 	st.b      $a0, $t1, 0x7
 
 #endif
-/* 1. wait until init done */
+/* 1. wait until init done (有界：MC 不报 init done 时不能永远自旋；
+   $t0 在本函数里是纯临时量（文件头注释：GET_NUMBER_OF_SLICES 把
+   $t0 当输出改写），掩码提到循环外，脱身后让后续流程继续跑，
+   失败至少是可观测的) */
 	li.d     $t1, 0x160
 	or      $t1, $t1, $t8
+	li.d     $t4, 0x00000000ff000000
+	li.d     $t0, 0x10000000
 wait_dram_init_done:
 	ld.d      $a0, $t1, 0x0
-	li.d     $t4, 0x00000000ff000000
 	and     $a0, $a0, $t4
-	beqz    $a0, wait_dram_init_done
-	nop
+	bnez     $a0, .Ldram_init_seen
+	addi.d   $t0, $t0, -1
+	bnez     $t0, wait_dram_init_done
+.Ldram_init_seen:
 
 write_leveling:
 	MM_PRINTSTR("\r\nwrite leveling begin\r\n")

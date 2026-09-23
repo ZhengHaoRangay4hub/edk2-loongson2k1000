@@ -2226,6 +2226,12 @@ t5: value
     st.d      $a1, $a4, 0x0
     dbar 0
 
+    /* 有界等待：出厂 PMON 在这里永远重试，控制器只要不报 init done，
+       整机就静默停住（beep(4) 永远不会响）。$t6 是整段等待的重试预算；
+       循环体、GET_MC_CS_MAP、MM_PRINTSTR 只动 $a0-$a5/$t1/$ra，
+       而 ddr2_config 返回后没有任何代码读 $t6（mc_init 用到前都先赋值）。 */
+    li.d     $t6, 0x1000
+
 wait_dram_init:
     //wait initialization complete
     //delay
@@ -2251,8 +2257,10 @@ wait_dram_init:
     ld.d      $a2, $a4, 0x0
     srli.d    $a2, $a2, DRAM_INIT_OFFSET
     and     $a2, $a2, $a1
-    //bne     $a1, $a2, 1b
-    bne     $a1, $a2, wait_dram_init
+    beq     $a1, $a2, ddr2_config_end
+    nop
+    addi.d  $t6, $t6, -1
+    bnez    $t6, wait_dram_init
     nop
 
 ddr2_config_end:

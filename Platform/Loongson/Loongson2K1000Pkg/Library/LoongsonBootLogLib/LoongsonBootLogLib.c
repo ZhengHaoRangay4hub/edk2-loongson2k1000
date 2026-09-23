@@ -43,7 +43,7 @@
 #include <Library/LoongsonBootLog.h>
 
 /* Uncached alias of a physical address (DMW0 in Start.S). */
-#define UNCACHED(x)  ((UINTN)(0x9000000000000000ULL | (UINT64)(x)))
+#define UNCACHED(x)  ((UINTN)(0x8000000000000000ULL | (UINT64)(x)))
 
 #define SPI_REG_BASE  UNCACHED (LS2K_SPI0_BASE)
 
@@ -61,23 +61,43 @@
 #define NOR_WREN     0x06
 #define NOR_RDSR     0x05
 #define NOR_PROGRAM  0x02
-#define NOR_ERASE_4K 0x20
+/*
+ * SR2/SR3.  On the W25Q32 family the protection bits are not all in SR1 (BP0-4
+ * and SRP0 are; SRP1/CMP/WPS live in SR2/SR3, per docs/understanding/
+ * 09-adversarial-flash.md §4.2), so a single-byte 0x01 write cannot claim to have
+ * cleared block protection on its own.  A part that does not implement these
+ * opcodes answers something meaningless, so the values below are only ever
+ * recorded, never interpreted by the firmware.
+ */
+#define NOR_RDSR2    0x35
+#define NOR_RDSR3    0x15
 
 #define SPI_CS_ASSERT   0x01
 #define SPI_CS_RELEASE  0x11
 
 /*
- * The read and write clocks of the controller.  PARAM bit 0 (memory_en) is what
- * the hardware gates software chip select on: while it is set the controller
- * serves the boot window and ignores the command engine, which is why a log
- * that never wrote PARAM never programmed a byte.
+ * The read and write clocks of the controller.  PARAM bit 0 is memory_en, and
+ * the manual is explicit about what it does: it is the SPI flash read enable,
+ * and "无效时 csn[0]可由软件控制" (表 10-8，印刷第 105 页)。§10.5.3（第 108 页）说明后果：
+ * 关掉读使能后软件才直接控制 csn[0]，"这意味着在进行此操作时，不能从 SPI
+ * Flash 中取指"。
  *
- * PMON's spi_initw/spi_initr carry exactly these two values, and it can flip
- * between them at run time because its code is executing from RAM, not from
- * the flash it is writing -- the boot ROM copies the image into the on-chip
- * memory at reset.  The same is true here.
+ * 所以标记的 SPI 事务与这段代码的取指是互斥的——手册里没有"置位时控制器忽略
+ * 命令引擎"这句话，那是本库自己写的猜测（原文在 docs/BRINGUP.md:506）。下面两条
+ * 规则就是从这里来的，标记通路必须两条都守：PARAM 是第一个 SPI 事务之前最后写的
+ * 一个寄存器、也是最后一个事务之后第一个被恢复的寄存器；中间不允许夹任何非 SPI
+ * 事务的代码。
+ *
+ * SPI_PARAM_READ 必须是 XIP 读通路当时真正在用的值：SpiFlashSpeedup()
+ * （Sec/PreMem/LoongsonPreMem.c:144）写的是 0x27，所以回写 0x27。原来的 0x17 是
+ * 0x27 把 clk_div 从 2 改成 1（表 10-7 / 表 10-8），回写它等于在退出每个标记时把
+ * 读时钟翻倍——正在出问题的那条通路不该再动。
+ *
+ * PMON 的 spi_initw/spi_initr 用的是 0x10/0x17（refs/pmon spawn Targets/ls2k/dev/
+ * spi_w.c:52-68），但 PMON 在这块板上从没跑过它的 flash 写命令，所以那不是"这两个
+ * 值能用"的证据。
  */
-#define SPI_PARAM_READ   0x17
+#define SPI_PARAM_READ   0x27
 #define SPI_PARAM_WRITE  0x10
 
 /* Log geometry: one header record followed by a 4-byte slot per event code. */
@@ -106,10 +126,6 @@
  * nothing.  The primitives and the API stay in the tree behind this switch,
  * ready for the phase that runs from DRAM and can talk to the flash safely.
  */
-#ifndef BOOTLOG_FLASH_ENABLE
-#define BOOTLOG_FLASH_ENABLE  0
-#endif
-
 #if BOOTLOG_FLASH_ENABLE
 
 /* ------------------------------------------------------------------ */
@@ -262,74 +278,20 @@ LogWrite (
 #define GPIO_DATA_HI  UNCACHED (0x1fe00514)
 #define BEEP_BIT      0x80u
 
-/*
- * The factory PMON drives the buzzer the same way: GPIO39 is bit 7 of the
- * upper GPIO word, its direction bit lives at 0x1fe00504 and its output data
- * at 0x1fe00514.  Toggling that data bit from a software delay loop makes the
- * tone, so the pitch is whatever this code's loop timing happens to produce.
- *
- * That timing is not knowable from here: SEC executes from the uncached boot
- * window, where every instruction fetch costs a bus round trip, so the same
- * delay count lands on a different pitch than it would from cache.  Guessing
- * the count is what cost two boots: one attempt aimed for ~1.5 kHz and came out
- * silent.
- *
- * So the beep is played as a short chirp that walks four delay values spanning
- * one octave apart.  Every value in it is one the board has already been heard
- * to sound at, and between them the tone is bound to be audible whatever the
- * real loop cost turns out to be.  It warbles and sounds rough -- which is the
- * "hoarse but clear" the board's owner asked for.
- */
-#define BEEP_FIRST_PERIOD  0x40  /* the four steps are this shifted by 0..3 */
-#define BEEP_STEP_HALVES   8
-#define BEEP_HALF_CYCLES   0x20  /* 32 half periods: 4 steps, ~0.2 s */
-#define BEEP_GAP_LOOPS     0x4000
+/**
+  PMON's own waveform, from Start.S.
 
-STATIC
+  Everything audible used to be produced here with a C delay loop, and it never
+  sounded like the factory firmware: PMON's half period is 0x2000 iterations of
+  addi.w + nop + bnez, while this was 0x40..0x200 iterations of a volatile
+  counter - two orders of magnitude off the frequency the element is loud at,
+  which is why the board's owner could not hear it well enough to count beeps.
+  The assembly version is PMON's loop, unchanged, and needs no stack.
+**/
 VOID
-BeepDelay (
-  IN UINTN  Loops
-  )
-{
-  volatile UINTN  Index;
-
-  for (Index = 0; Index < Loops; Index++) {
-  }
-}
-
-STATIC
-VOID
-BeepToneCycles (
-  IN UINTN  Cycles
-  )
-{
-  UINT32  Value;
-  UINTN   Half;
-
-  /* The other pins in this word are left exactly as they were found. */
-  Value = MmioRead32 (GPIO_DATA_HI) & ~BEEP_BIT;
-
-  for (Half = 0; Half < Cycles; Half++) {
-    Value ^= BEEP_BIT;
-    MmioWrite32 (GPIO_DATA_HI, Value);
-
-    /*
-     * Shifted rather than looked up in a table: a table would be a load from
-     * this image's read-only data, and the point of the exercise is that the
-     * code and its constants are the only things known to be fetchable here.
-     */
-    BeepDelay ((UINTN)BEEP_FIRST_PERIOD << ((Half / BEEP_STEP_HALVES) & 3));
-  }
-}
-
-STATIC
-VOID
-BeepOff (
-  VOID
-  )
-{
-  MmioWrite32 (GPIO_DATA_HI, MmioRead32 (GPIO_DATA_HI) & ~BEEP_BIT);
-}
+LoongsonBeepRaw (
+  IN UINTN  Count
+  );
 
 VOID
 EFIAPI
@@ -337,17 +299,7 @@ LoongsonBootBeep (
   IN UINTN  Count
   )
 {
-  UINTN  Index;
-
-  /* GPIO39 as an output; the factory PMON clears the same bit. */
-  MmioWrite32 (GPIO_DIR_HI, MmioRead32 (GPIO_DIR_HI) & ~BEEP_BIT);
-  BeepOff ();
-
-  for (Index = 0; Index < Count; Index++) {
-    BeepToneCycles (BEEP_HALF_CYCLES);
-    BeepOff ();
-    BeepDelay (BEEP_GAP_LOOPS);
-  }
+  LoongsonBeepRaw (Count);
 }
 
 VOID
@@ -356,26 +308,17 @@ LoongsonBootBeepLong (
   VOID
   )
 {
-  /* Distinct from any count pattern: three times as long. */
-  MmioWrite32 (GPIO_DIR_HI, MmioRead32 (GPIO_DIR_HI) & ~BEEP_BIT);
-
-  BeepToneCycles (BEEP_HALF_CYCLES * 3);
-  BeepOff ();
+  LoongsonBeepRaw (3);
 }
 
 /**
-  Play a rising scale, from the slowest delay to the fastest.
+  Kept for its call site, but no longer a scale.
 
-  The pitch of a software square wave is set by how fast this code can toggle
-  the pin, and SEC executes uncached from the boot window, so that cost is not
-  knowable from outside: a single guessed delay already cost two silent boots.
-  A scale answers the question in one power cycle -- whichever step sounds
-  loudest and cleanest names the delay worth using.
-
-  Six steps, each four times faster than the last, so the range spans a factor
-  of a thousand either side of anything guessed so far.  The slowest step takes
-  many times longer than the fastest, which is intentional: the fast ones only
-  need to be present, not beautiful.
+  The sweep existed to find the pitch this board's buzzer is loud at, by
+  wandering through delays and listening for the loudest step.  The answer
+  turned out to be PMON's own half period, so the scale has nothing left to
+  search: it plays one beep, in the waveform that is known to be loud, and the
+  call site still marks the same milestone.
 **/
 VOID
 EFIAPI
@@ -383,28 +326,7 @@ LoongsonBootBeepScale (
   VOID
   )
 {
-  UINTN   Step;
-  UINTN   Delay;
-  UINTN   Half;
-  UINT32  Value;
-
-  MmioWrite32 (GPIO_DIR_HI, MmioRead32 (GPIO_DIR_HI) & ~BEEP_BIT);
-  Value = MmioRead32 (GPIO_DATA_HI) & ~BEEP_BIT;
-
-  for (Step = 0; Step < 6; Step++) {
-    Delay = (UINTN)0x2000 >> (Step * 2);
-
-    for (Half = 0; Half < 32; Half++) {
-      Value ^= BEEP_BIT;
-      MmioWrite32 (GPIO_DATA_HI, Value);
-      BeepDelay (Delay);
-    }
-
-    /* Long enough to separate one step from the next. */
-    BeepDelay (0x4000);
-  }
-
-  BeepOff ();
+  LoongsonBeepRaw (1);
 }
 
 /* ------------------------------------------------------------------ */
@@ -493,15 +415,54 @@ LoongsonBootLogEvent (
 /* ------------------------------------------------------------------ */
 
 /*
- * The primitives below follow PMON's spi_w.c byte for byte, because getting
- * them subtly wrong is invisible: a controller that refuses the command, or a
- * chip whose block protection is still set, both leave the flash exactly as it
- * was -- indistinguishable from firmware that never ran.
+ * Compiled out of the board build by default, on purpose.
+ *
+ * This is the only code in SEC that deliberately switches off the instruction
+ * fetch it is running from: 表 10-8 gives csn[0] to software only while PARAM
+ * bit 0 is clear, and §10.5.3 says that with the read enable off the chip cannot
+ * fetch from SPI flash at all.  Whether the silicon really stops fetching is
+ * untested on this board (docs/understanding/09-adversarial-flash.md §2.4), but
+ * every boot since the marks were added has been silent, and a mark is the one
+ * action in the boot path whose failure mode is indistinguishable from a dead
+ * board.  So the marks default to off, and the image that gets flashed next must
+ * be able to boot with the SPI command engine untouched from reset to DXE.
+ *
+ * Turn them on only in a diagnostic image, by setting this #define to 1 and
+ * rebuilding (a one-character edit, the same way BOOTLOG_FLASH_ENABLE is
+ * switched).  A command-line `build -D BOOTMARK_FLASH_ENABLE=1` does NOT reach
+ * C code: EDK2's command-line defines are build-tool macros, they expand in the
+ * DSC/FDF and never land in the module's CC_FLAGS - measured on this tree,
+ * where gCommandLineDefines held the flag while CC_FLAGS did not and
+ * LoongsonBootMark() still came out as a 4-byte ret.
+ *
+ * With the marks enabled LoongsonBootMark() keeps the
+ * PARAM clear bracketed as tightly as the hardware allows: PARAM last in before
+ * the first transaction, first out after the last, no erase, and the whole
+ * record written by a single page program.
+ */
+#if BOOTMARK_FLASH_ENABLE
+
+/*
+ * The primitives below follow PMON's spi_w.c, because getting them subtly wrong
+ * is invisible: a controller that refuses the command, or a chip whose block
+ * protection is still set, both leave the flash exactly as it was --
+ * indistinguishable from firmware that never ran.  Where they differ from PMON
+ * the difference is a bound (see each function), because every wait here is
+ * spent with the read enable clear.
  */
 
 /**
   Send one byte and wait for it to leave the FIFO.  PMON's send_spi_cmd does
   this for every byte; skipping the wait drops bytes on the floor.
+
+  The wait is on SPSR bit 0 (rfempty, 表 10-4 第 103 页), which is what PMON polls
+  too: refs/pmon Targets/ls2k/dev/spi_w.c:76 `while(((GET_SPI(SPSR)) & RFEMPTY)
+  && timeout--)`, with `#define RFEMPTY 1` at :38.  The read below drains the byte
+  the controller shifted in at the same time.
+
+  The bound is PMON's own, 1000, not the 100000 this used to be: every one of
+  these iterations runs with PARAM bit 0 clear, where the CPU cannot fetch, so a
+  bound that can outlast the boot is not a bound.
 **/
 STATIC
 UINT8
@@ -514,7 +475,7 @@ BootMarkSend (
 
   MmioWrite8 (Spi + SPI_FIFO, Value);
 
-  Timeout = 100000;
+  Timeout = 1000;
   while (((MmioRead8 (Spi + SPI_SPSR)) & SPI_RFEMPTY) != 0) {
     if (Timeout-- == 0) {
       break;
@@ -534,24 +495,46 @@ BootMarkCs (
   MmioWrite8 (Spi + SPI_SOFTCS, State);
 }
 
-/** Read the status register (0x05), PMON's read_sr. */
+/** Read a status register: 0x05 = SR1, 0x35 = SR2, 0x15 = SR3. */
 STATIC
 UINT8
-BootMarkReadSr (
-  IN UINTN  Spi
+BootMarkReadSrReg (
+  IN UINTN  Spi,
+  IN UINT8  Opcode
   )
 {
   UINT8  Value;
 
   BootMarkCs (Spi, SPI_CS_ASSERT);
-  BootMarkSend (Spi, NOR_RDSR);
+  BootMarkSend (Spi, Opcode);
   Value = BootMarkSend (Spi, 0x00);
   BootMarkCs (Spi, SPI_CS_RELEASE);
 
   return Value;
 }
 
-/** Wait out the chip's busy bit, with a bound so a dead chip cannot hang boot. */
+/** Read SR1 (0x05), PMON's read_sr. */
+STATIC
+UINT8
+BootMarkReadSr (
+  IN UINTN  Spi
+  )
+{
+  return BootMarkReadSrReg (Spi, NOR_RDSR);
+}
+
+/**
+  Wait out the chip's busy bit, with a bound so a dead chip cannot hang boot.
+
+  The bound is 20000 status reads, not the 1000000 this used to be.  Each read is
+  a full SPI transaction issued with PARAM bit 0 clear, i.e. with instruction
+  fetch from this very flash switched off (§10.5.3), so this number *is* the
+  worst case the board can be left deaf for.  PMON's is 1000 (spi_w.c:101); this
+  path still has to wait out one page program (milliseconds) and one status
+  register write, so 20000 keeps a wide margin while staying inside tens of
+  milliseconds.  The 4 KB sector erase that needed a seconds-scale bound is gone
+  (see LoongsonBootMark).
+**/
 STATIC
 VOID
 BootMarkWaitBusy (
@@ -560,7 +543,7 @@ BootMarkWaitBusy (
 {
   UINT32  Timeout;
 
-  Timeout = 1000000;
+  Timeout = 20000;
   while (((BootMarkReadSr (Spi) & 0x01) != 0) && (Timeout-- != 0)) {
   }
 }
@@ -580,20 +563,34 @@ BootMarkWren (
 }
 
 /**
-  Clear every block-protection bit in the status register.
+  Clear the status register's protection bits and report SR1 as it reads back.
 
-  This is the step that decides whether anything else works.  A chip with BP0-3,
-  TB, SEC or SRP set answers a sector erase or a page program by ignoring it and
-  reporting success on the bus, so the firmware's marks would never appear and
-  the board would look exactly like one that never ran.  PMON writes the status
-  register to zero before every erase and every program for the same reason.
+  This is the step that decides whether anything else works.  A chip with BP0-4
+  or SRP0 set answers a page program by ignoring it and reporting success on the
+  bus, so the firmware's marks would never appear and the board would look
+  exactly like one that never ran.  PMON writes the status register to zero
+  before every erase and every program for the same reason (refs/pmon Targets/
+  ls2k/dev/spi_w.c:121, :389, :421) -- but PMON's write_sr is one byte wide too
+  (:143-155), so it proves only that SR1 was written.
+
+  0x01 writes SR1 only: BP0-4 are SR1 bits 6:2 and SRP0 is bit 7, so this byte
+  covers those.  The protection bits that live in SR2/SR3 (SRP1, CMP, WPS on the
+  W25Q32 family) are not covered by it, which is exactly why the caller records
+  SR1/SR2/SR3 as read back instead of assuming the clear worked.  Whether a
+  given part implements 0x35/0x15 at all is not checked here; a part that does
+  not answers with something meaningless, and that byte is recorded, not acted
+  on.
+
+  @return SR1 after the write.  bit0 = busy, bits 6:2 = BP0-4, bit7 = SRP0.
 **/
 STATIC
-VOID
+UINT8
 BootMarkUnprotect (
   IN UINTN  Spi
   )
 {
+  UINT8  Sr1;
+
   BootMarkWren (Spi);
 
   /* Enable-Write-Status-Register (0x50), PMON's en_write_sr. */
@@ -606,6 +603,25 @@ BootMarkUnprotect (
   BootMarkSend (Spi, 0x01);
   BootMarkSend (Spi, 0x00);
   BootMarkCs (Spi, SPI_CS_RELEASE);
+
+  /* 0x01 starts an internal write cycle; the chip ignores everything until it
+     ends, and a WREN that lands inside it is dropped without a word. */
+  BootMarkWaitBusy (Spi);
+
+  Sr1 = BootMarkReadSrReg (Spi, NOR_RDSR);
+  if ((Sr1 & 0xFC) != 0) {
+    /* One retry, because the likeliest reason a clear did not take is a WREN
+       that arrived during the previous write cycle. */
+    BootMarkWren (Spi);
+    BootMarkCs (Spi, SPI_CS_ASSERT);
+    BootMarkSend (Spi, 0x01);
+    BootMarkSend (Spi, 0x00);
+    BootMarkCs (Spi, SPI_CS_RELEASE);
+    BootMarkWaitBusy (Spi);
+    Sr1 = BootMarkReadSrReg (Spi, NOR_RDSR);
+  }
+
+  return Sr1;
 }
 
 /*
@@ -614,78 +630,126 @@ BootMarkUnprotect (
  * worked out from the source.  "Where did it stop?" has therefore been
  * unanswerable, and every attempt to answer it by ear was a guess.
  *
- * A mark answers it by machine: each milestone programs one byte into a sector
- * high in the chip, so reading the chip with the programmer afterwards shows
- * how far the firmware got.  Programming turns 0xFF into the code, which is
- * the direction NOR flash moves on its own -- the sectors used here are erased
- * (0xFF) as the board ships, so a mark is a lone byte standing out in 4 KB of
- * 0xFF.  Erasing would have been the wrong direction: an erased sector reads
- * the same as one that was never touched.
+ * A mark answers it by machine: each milestone programs one byte into one
+ * dedicated 4 KB sector at the top of the log region (LS2K_MARK_BASE), so
+ * reading the chip with the programmer afterwards shows how far the firmware
+ * got.  Programming turns 0xFF into the code, which is the direction NOR flash
+ * moves on its own: that sector ships erased and nothing else -- no firmware
+ * volume, no log entry, no variable write -- ever lands in it, so a mark is a
+ * lone byte standing out in 4 KB of 0xFF.
  *
- * The write uses PMON's own clock dance: put the controller on its write clock
- * first, because PARAM bit 0 (memory_en) is what gates software chip select --
- * with it set the controller serves the boot window and ignores the command
- * engine.  PMON gets away with flipping this at run time because its code
- * executes from on-chip memory rather than from the flash it is programming;
- * the same holds for this image.
+ * There is no erase here, and there must not be one.  Erasing would be the wrong
+ * direction (an erased sector reads like one that was never touched), and a 4 KB
+ * sector erase keeps the chip busy for tens of milliseconds -- docs/BOOTLOG.md:66-67
+ * reaches the same conclusion -- every millisecond of it spent with PARAM bit 0
+ * clear while the CPU fetches from that same chip.  Instead the whole record is
+ * written by one page program: the mark byte and the SR1/SR2/SR3 snapshot share
+ * a 256 byte page, so the read enable is cleared once per mark rather than once
+ * per byte and restored immediately after.
  *
- * The mark sits far above the firmware, so no image overwrites it and it
- * survives across boots until the chip is erased.
+ * The mark sector is the only 4 KB of the 4 MB part that is above the 1 MB
+ * reset window, outside every firmware volume, outside the variable store and
+ * outside its FTW working and spare blocks (Loongson2K1000Pkg.dsc:366-375), and
+ * it is 0xFF as the board ships (verified in the factory dump and in the
+ * full-chip read of the live chip).  LoongsonBootMark() enforces that: a call
+ * naming any other address, or the wrong code for the slot, is refused instead
+ * of written -- the old call sites named 0x3B0000..0x3F0000, which is precisely
+ * the FTW area, so a stale call site used to corrupt variables rather than leave
+ * a trace.
  */
 VOID
 EFIAPI
 LoongsonBootMark (
-  IN UINTN  SectorOffset,
+  IN UINTN  Offset,
   IN UINT8  Code
   )
 {
+  UINT8  Record[LS2K_MARK_PAGE_LEN];
+  UINTN  Index;
   UINTN  Spi;
+
+  /*
+   * Fail closed.  A mark is accepted only at one of the five slot addresses and
+   * only with the code that belongs to that slot (0xA1 + slot); anything else is
+   * a no-op.  A refused mark costs one missing byte in a diagnostic, an accepted
+   * one at the wrong address used to corrupt the variable store's FTW blocks.
+   */
+  if ((Offset < LS2K_MARK_BASE) || (Offset >= LS2K_MARK_BASE + 5)) {
+    return;
+  }
+
+  if (Code != (UINT8)(0xA1 + (Offset - LS2K_MARK_BASE))) {
+    return;
+  }
+
+  /*
+   * Build the record before touching the controller: nothing below this point
+   * may run while the read enable is clear except the SPI transactions
+   * themselves.  Slots left at 0xFF are no-ops on a byte that already holds a
+   * value, so the status snapshot accumulates as the AND of every boot that got
+   * this far -- 0xFF still means "no boot ever wrote it".
+   */
+  for (Index = 0; Index < LS2K_MARK_PAGE_LEN; Index++) {
+    Record[Index] = 0xFF;
+  }
+
+  Record[Offset - LS2K_MARK_BASE] = Code;
 
   Spi = SPI_REG_BASE;
 
-  /* All chip selects high, then the write clock (PMON's spi_initw). */
-  MmioWrite8 (Spi + SPI_SOFTCS, 0xff);
-  MmioWrite8 (Spi + SPI_PARAM, SPI_PARAM_WRITE);
-  MmioWrite8 (Spi + SPI_SPSR, 0xc0);
-  MmioWrite8 (Spi + SPI_PARAM2, 0x01);
+  /* Transaction setup.  SPSR is a status register: 0xc0 clears spif and wcol
+     (表 10-4：写 1 清零), it enables nothing.  PMON's spi_initw writes the same
+     four values (spi_w.c:52-60). */
   MmioWrite8 (Spi + SPI_SPER, 0x04);
+  MmioWrite8 (Spi + SPI_PARAM2, 0x01);
   MmioWrite8 (Spi + SPI_SPCR, 0x51);
 
-  BootMarkUnprotect (Spi);
+  /* The read enable goes off here.  §10.5.3 is why nothing but a SPI
+     transaction may happen until it is back on. */
+  MmioWrite8 (Spi + SPI_PARAM, SPI_PARAM_WRITE);
+  MmioWrite8 (Spi + SPI_SOFTCS, 0xff);
+  MmioWrite8 (Spi + SPI_SPSR, 0xc0);
 
-  /*
-   * Erase the sector before programming into it.
-   *
-   * A sector that is already 0xFF cannot show whether an erase command ever
-   * arrived -- erasing it is a no-op either way.  So the field below is
-   * pre-loaded with 0x00 by the programmer, and this erase turns it to 0xFF:
-   * a sector still reading 0x00 means the firmware never got here, a sector
-   * reading 0xFF means it got here and the controller accepted commands, and
-   * the code byte appearing means the program step works too.  Without the
-   * erase there is no way to tell "never ran" from "ran but could not write".
-   */
+  /* Clear the protection bits, then record what the three status registers read
+     back -- a mark that never appears has to be explainable without a second
+     bring-up. */
+  Record[LS2K_MARK_SR1 - LS2K_MARK_BASE] = BootMarkUnprotect (Spi);
+  Record[LS2K_MARK_SR2 - LS2K_MARK_BASE] = BootMarkReadSrReg (Spi, NOR_RDSR2);
+  Record[LS2K_MARK_SR3 - LS2K_MARK_BASE] = BootMarkReadSrReg (Spi, NOR_RDSR3);
+
+  /* One page program for the whole record: mark byte and snapshot together. */
   BootMarkWren (Spi);
-  BootMarkCs (Spi, SPI_CS_ASSERT);
-  BootMarkSend (Spi, NOR_ERASE_4K);
-  BootMarkSend (Spi, (UINT8)(SectorOffset >> 16));
-  BootMarkSend (Spi, (UINT8)(SectorOffset >> 8));
-  BootMarkSend (Spi, (UINT8)SectorOffset);
-  BootMarkCs (Spi, SPI_CS_RELEASE);
-  BootMarkWaitBusy (Spi);
-
-  BootMarkWren (Spi);
-
-  /* Page program, one byte, 24 bit address. */
   BootMarkCs (Spi, SPI_CS_ASSERT);
   BootMarkSend (Spi, NOR_PROGRAM);
-  BootMarkSend (Spi, (UINT8)(SectorOffset >> 16));
-  BootMarkSend (Spi, (UINT8)(SectorOffset >> 8));
-  BootMarkSend (Spi, (UINT8)SectorOffset);
-  BootMarkSend (Spi, Code);
+  BootMarkSend (Spi, (UINT8)(LS2K_MARK_BASE >> 16));
+  BootMarkSend (Spi, (UINT8)(LS2K_MARK_BASE >> 8));
+  BootMarkSend (Spi, (UINT8)LS2K_MARK_BASE);
+  for (Index = 0; Index < LS2K_MARK_PAGE_LEN; Index++) {
+    BootMarkSend (Spi, Record[Index]);
+  }
   BootMarkCs (Spi, SPI_CS_RELEASE);
-
   BootMarkWaitBusy (Spi);
 
-  /* Back to the read clock so the next fetch is served again. */
+  /* The read enable comes back before anything that is not a SPI transaction. */
   MmioWrite8 (Spi + SPI_PARAM, SPI_PARAM_READ);
 }
+
+#else
+
+/*
+ * Nothing is programmed when the marks are compiled out.  The call sites stay
+ * in the tree -- they are part of the recorded boot order -- and become no-ops,
+ * so enabling or disabling the marks never changes anything but this library.
+ */
+VOID
+EFIAPI
+LoongsonBootMark (
+  IN UINTN  Offset,
+  IN UINT8  Code
+  )
+{
+  (VOID)Offset;
+  (VOID)Code;
+}
+
+#endif

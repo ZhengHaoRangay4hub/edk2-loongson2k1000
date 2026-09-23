@@ -216,7 +216,11 @@ ASM_PFX(DdrEntryAsm):
 #include "ddr_dir/Test_Mem.S"
 #endif
 back_start:
-	ld.d	$s2, $sp, 8
+	/* $s2 (= msize) 就是返回值：ddr_dir/loongson3_ddr2_config.S:1102 做
+	   `or msize, msize, $t5` 并打印 "msize = 0x…"，Start.S 里
+	   `bl DdrEntryAsm` 处也明写 "leaves memory size in $s2" 后把它作为
+	   BOOTLOG_SEC_DDR_DONE 的参数；这里把保存的旧值恢复回去等于把这个
+	   结果丢掉（PMON 的 ddr_entry.S 的 back_start 没有这一步恢复）。 */
 	ld.d	$ra, $sp, 0
 	addi.d	$sp, $sp, 16
 	jr	$ra

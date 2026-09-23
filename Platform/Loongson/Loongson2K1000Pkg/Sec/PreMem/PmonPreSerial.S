@@ -45,10 +45,14 @@ ASM_PFX(initserial_later):
 	st.b	$a1, $a0, 1
 	li.w	$a1, 68			# 125M / (68 * 16) ~ 115200
 	st.b	$a1, $a0, 0
+	li.w	$a6, 0x40000
 1:
 	ld.bu	$a2, $a0, 5
 	andi	$a2, $a2, 0x20
-	beqz	$a2, 1b
+	bnez	$a2, .Llater_tx_ready
+	addi.w	$a6, $a6, -1
+	bnez	$a6, 1b
+.Llater_tx_ready:
 	li.w	$a1, 3
 	st.b	$a1, $a0, 3
 	li.w	$a1, 71
@@ -64,10 +68,14 @@ ASM_PFX(initserial_later):
 ASM_GLOBAL ASM_PFX(tgt_putchar)
 ASM_PFX(tgt_putchar):
 	li.d	$a1, COM1_BASE_ADDR
+	li.w	$a6, 0x40000
 1:
 	ld.bu	$a2, $a1, 0x5
 	andi	$a2, $a2, 0x20
-	beqz	$a2, 1b
+	bnez	$a2, .Ltgt_tx_ready
+	addi.w	$a6, $a6, -1
+	bnez	$a6, 1b
+.Ltgt_tx_ready:
 	st.b	$a0, $a1, 0
 
 	/*
