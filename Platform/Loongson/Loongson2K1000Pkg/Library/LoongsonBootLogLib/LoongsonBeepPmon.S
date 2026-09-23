@@ -2,21 +2,13 @@
   The board's beeper, with PMON's pin, PMON's loop, and a half period scaled to
   this clock.
 
-  Two things were wrong before, and they are separate:
-
-    - The loop itself is PMON's (addi.w + nop + bnez is the inner delay), which
-      matters because the element only gets loud near its resonance.
-    - The half period has to be scaled.  PMON beeps while the CPU is still on
-      its reset clock, so its 0x2000 iterations land in the low kHz.  This code
-      runs after the PLLs are up, roughly ten times faster, so the same count
-      comes out ten times higher - and with the count left as PMON's it was
-      worse still, because the loop fetches from the uncached window.
-
-  The scale factor is not a guess from the source: it is read off the board.
-  With the unscaled count the owner hears separate clicks a few tens of times a
-  second rather than a tone, which puts the wave about fifty times too slow for
-  the low kHz band these elements are loud in.  Hence 0x2000 / 48 is taken as
-  the half period, with 0x80 half periods per beep (PMON's length).
+  The half period is PMON's own count, 0x2000 iterations of the addi.w + nop +
+  bnez inner delay.  That count was tuned on this board at the reset (pre-PLL)
+  clock, and every current call site runs there: all SEC progress beeps fire
+  before the clock stage.  DXE users of this library run after the PLLs, with
+  the loop fetching from the uncached window, so the same count lands far
+  above the buzzer's low-kHz resonance there - audible only as clicks.  That
+  is a known limitation of the DXE call sites, not of the count itself.
 
   A previous attempt copied the loop into the locked scache and ran it from
   there.  That is reverted: the lock is set up in Start.S, which only the SEC

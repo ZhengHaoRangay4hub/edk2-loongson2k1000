@@ -8,7 +8,7 @@
   initialized. Constraints:
     - no writable static data (.data/.bss would sit in NOR)
     - no DEBUG()/SerialPortLib calls (device tree not published yet)
-    - MMIO access only through the uncached DMW0 window (0x9000...)
+    - MMIO access only through the uncached DMW0 window (0x8000...)
 
   SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
@@ -636,12 +636,12 @@ PreMemInit (
   EarlySerialInit ();
   /* The banner is the only in-band version marker this image has, and the one
      channel a totally silent board would use to say anything at all.  It must
-     therefore name the image that is actually in the chip: v16 is the round
-     that fixed CRMD (BOOT_CRMD), the APB window before the clicks, the UART
-     mux register (0x1FE00428), the mark address (0x36F000) and the unbounded
-     waits.  A board that answers "v15" here is running the never-flashed
-     working tree, not this image -- see docs/BRINGUP.md, "v16" section. */
-  EarlyPutString ("\r\n\r\n=== LS2K1000LA EDK2 SEC [v16] ===\r\n");
+     therefore name the image that is actually in the chip: v27 is v26 (buzzer
+     half period restored to 0x2000) plus the audit fixes - working early
+     exception vector, guarded primary serial write, and this marker.  A board
+     that answers an older tag here is running a different image than the one
+     recorded in HANDOVER.md's ledger - see docs/BRINGUP.md. */
+  EarlyPutString ("\r\n\r\n=== LS2K1000LA EDK2 SEC [v27] ===\r\n");
   EarlyPutString ("APB BAR, watchdog: done; UART mux not yet written\r\n");
 
   /*

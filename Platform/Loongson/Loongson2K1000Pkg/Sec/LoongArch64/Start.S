@@ -162,8 +162,14 @@ ASM_PFX(_ModuleEntryPoint):
 	 *
 	 * On LoongArch every exception enters at EENTRY, so one long buzz here catches
 	 * all of them - a different sound from the progress beeps on purpose.
+	 *
+	 * The target must be the 4KB-aligned PreMemExceptionVector table: the
+	 * hardware forms the entry as "EENTRY page | offset" (see the comment at
+	 * the second write below), so the old EarlyExceptionCatch target - never
+	 * page-aligned - could never be reached by any exception and silently
+	 * routed faults to unrelated code at the page base instead.
 	 */
-	la.pcrel $t0, EarlyExceptionCatch
+	la.pcrel $t0, PreMemExceptionVector
 	csrwr	$t0, 0xc
 
 	/* Disable global interrupt */

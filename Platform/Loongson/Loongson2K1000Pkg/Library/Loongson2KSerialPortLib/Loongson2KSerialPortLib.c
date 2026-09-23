@@ -73,16 +73,21 @@
 // reach it.  Keep this a compile time constant: SerialPortLib is used from SEC
 // onwards, before there is any HOB or handle to look an address up with.
 //
-// The console is the LVTTL port so a plain 3.3V USB-TTL adapter can read it;
-// every byte is mirrored to the RS232 debug port (UART0) as well, so the old
-// wiring keeps working during bring-up.  Set LS2K_CONSOLE_MIRROR_BASE to 0 in
-// Include/Library/Loongson2K1000.h to drop the mirror.
+// The primary console is the RS232 debug port (UART0), matching PMON and the
+// SEC helpers; every byte is mirrored to the LVTTL header port (UART3) as
+// well, so a plain 3.3V USB-TTL adapter on pins 8/10 sees the log too.  The
+// port pair lives in Loongson2K1000.h (LS2K_CONSOLE_BASE /
+// LS2K_CONSOLE_MIRROR0_BASE); set the mirror to 0 there to drop it.
 //
+// QEMU note: the ls2k machine model decodes the UART at this same on-chip
+// address, so the same binary prints in the emulator; the older FDT-based
+// OvmfPkg libraries were retired precisely because they only worked there.
+//
+/* Polls a port is willing to spend before writing anyway. */
+#define UART_MIRROR_GUARD  0x800
+
 #define UART_BASE          ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_BASE))
 #define UART_MIRROR0_BASE  ((UINTN)LS_MMIO_UNCACHED (LS2K_CONSOLE_MIRROR0_BASE))
-
-/* Polls a mirror is willing to spend before writing anyway. */
-#define UART_MIRROR_GUARD  0x800
 
 /**
   Program the divisor latches for a given baud rate.
@@ -225,8 +230,19 @@ SerialPortWrite (
   }
 
   for (Index = 0; Index < NumberOfBytes; Index++) {
+    //
+    // Primary port: bounded poll as well.  It is UART0 (RS232) today, which
+    // answers at reset, but an unbounded wait here means one bad clock gate
+    // or one wrong base address hangs the whole firmware on the first
+    // character - exactly the failure this library exists to prevent.
+    //
+    UINT32  Guard;
+
+    Guard = UART_MIRROR_GUARD;
     while ((MmioRead8 (UART_BASE + UART_LSR) & UART_LSR_THR_EMPTY) == 0) {
-      CpuPause ();
+      if (--Guard == 0) {
+        break;
+      }
     }
 
     MmioWrite8 (UART_BASE + UART_THR, Buffer[Index]);
